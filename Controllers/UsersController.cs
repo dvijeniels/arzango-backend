@@ -1,0 +1,131 @@
+﻿using ArzanGo.Data;
+using ArzanGo.Models;
+using ArzanGo.Models.Request;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+
+namespace ArzanGo.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class UsersController : ControllerBase
+    {
+        private readonly AppDbContext _context;
+        private readonly IConfiguration _config;
+        public UsersController(AppDbContext context, IConfiguration config)
+        {
+            _context = context;
+            _config = config;
+        }
+
+        // ✅ Получить всех пользователей
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        {
+            return await _context.Users.Include(u => u.Orders)
+                                       .Include(u => u.Favorites)
+                                       .Include(u => u.ShippingAddresses)
+                                       .ToListAsync();
+        }
+
+        // ✅ Получить одного пользователя по ID
+        [HttpGet("{id}")]
+        public async Task<ActionResult<User>> GetUser(Guid id)
+        {
+            var user = await _context.Users.Include(u => u.Orders)
+                                           .Include(u => u.Favorites)
+                                           .Include(u => u.ShippingAddresses)
+                                           .FirstOrDefaultAsync(u => u.UserId == id);
+
+            if (user == null)
+                return NotFound();
+
+            return user;
+        }
+
+        // ✅ Создать нового пользователя
+        [HttpPost]
+        public async Task<ActionResult<User>> CreateUser(User user)
+        {
+            user.UserId = Guid.NewGuid(); // Генерируем новый ID
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetUser), new { id = user.UserId }, user);
+        }
+
+        // ✅ Обновить пользователя
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateUser(Guid id, User user)
+        {
+            if (id != user.UserId)
+                return BadRequest();
+
+            _context.Entry(user).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!_context.Users.Any(e => e.UserId == id))
+                    return NotFound();
+                else
+                    throw;
+            }
+
+            return NoContent();
+        }
+
+        // ✅ Удалить пользователя
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(Guid id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+                return NotFound();
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+
+        [HttpPost("login")]
+        public IActionResult Login([FromBody] LoginModel model)
+        {
+            // Здесь должна быть ваша логика проверки пользователя
+            if (model.Username != "validUser" || model.Password != "validPassword")
+                return Unauthorized();
+
+            var token = GenerateJwtToken(model.Username);
+            return Ok(new { Token = token });
+        }
+        private string GenerateJwtToken(string username)
+        {
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            var claims = new[]
+            {
+            new Claim(JwtRegisteredClaimNames.Sub, username),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        };
+
+            var token = new JwtSecurityToken(
+                issuer: _config["Jwt:Issuer"],
+                audience: _config["Jwt:Audience"],
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(Convert.ToDouble(_config["Jwt:ExpireDays"])),
+                signingCredentials: credentials);
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+    }
+}

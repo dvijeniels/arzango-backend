@@ -1,0 +1,6 @@
+@ArzanGo_HostAddress = http://localhost:5007
+
+GET {{ArzanGo_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
