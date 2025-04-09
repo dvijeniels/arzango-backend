@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace ArzanGo.Models
 {
@@ -23,6 +24,8 @@ namespace ArzanGo.Models
         public decimal FinalPrice => DiscountPrice.HasValue ? DiscountPrice.Value : RetailPrice; //FinalPrice, которое всегда возвращает актуальную цену
 
         public Guid CategoryId { get; set; } // Идентификатор категории, к которой принадлежит товар
+
+        [JsonIgnore]
         public virtual Category? Category { get; set; } // Навигационное свойство для категории товара
 
         public virtual ICollection<ProductPhoto>? ProductPhotos { get; set; }
@@ -35,6 +38,8 @@ namespace ArzanGo.Models
         [StringLength(1200)]
         public required string PhotoPath { get; set; }
         public Guid ProductId { get; set; }
+
+        [JsonIgnore]
         public virtual Product? Products { get; set; }
     }
 }
