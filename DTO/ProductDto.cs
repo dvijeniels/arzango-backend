@@ -19,6 +19,6 @@ namespace ArzanGo.DTO
         [Required]
         public Guid CategoryId { get; set; }
 
-        public List<IFormFile>? Photos { get; set; }
+        public IFormFileCollection? Photos { get; set; }
     }
 }

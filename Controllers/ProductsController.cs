@@ -21,7 +21,7 @@ namespace ArzanGo.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            return await _context.Products.Include(p => p.Category).ToListAsync();
+            return await _context.Products.Include(p => p.Category).Include(p=>p.ProductPhotos).ToListAsync();
         }
 
         // GET: api/products/5
@@ -43,61 +43,99 @@ namespace ArzanGo.Controllers
         [HttpPost]
         public async Task<ActionResult<Product>> PostProduct([FromForm] ProductDto productDto)
         {
-            // Создаем новый продукт
-            var product = new Product
+            try
             {
-                ProductId = Guid.NewGuid(),
-                Name = productDto.Name,
-                Description = productDto.Description,
-                PurchasePrice = productDto.PurchasePrice,
-                RetailPrice = productDto.RetailPrice,
-                DiscountPrice = productDto.DiscountPrice,
-                CategoryId = productDto.CategoryId,
-                ProductDate = DateTime.Now
-            };
+                // Валидация обязательных полей
+                if (string.IsNullOrEmpty(productDto.Name))
+                    return BadRequest("Название продукта обязательно");
 
-            _context.Products.Add(product);
+                if (productDto.CategoryId == Guid.Empty)
+                    return BadRequest("Категория обязательна");
 
-            // Обрабатываем загруженные файлы
-            if (productDto.Photos != null && productDto.Photos.Count > 0)
-            {
-                product.ProductPhotos = new List<ProductPhoto>();
-
-                foreach (var photo in productDto.Photos)
+                // Создаем новый продукт
+                var product = new Product
                 {
-                    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
-                    var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
+                    ProductId = Guid.NewGuid(),
+                    Name = productDto.Name,
+                    Description = productDto.Description,
+                    PurchasePrice = productDto.PurchasePrice,
+                    RetailPrice = productDto.RetailPrice,
+                    DiscountPrice = productDto.DiscountPrice,
+                    CategoryId = productDto.CategoryId,
+                    ProductDate = DateTime.Now
+                };
 
-                    if (string.IsNullOrEmpty(extension) || !allowedExtensions.Contains(extension))
+                _context.Products.Add(product);
+
+                // Обрабатываем загруженные файлы
+                if (productDto.Photos != null && productDto.Photos.Count > 0)
+                {
+                    product.ProductPhotos = new List<ProductPhoto>();
+
+                    // Путь к папке для загрузки
+                    var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "products");
+
+                    // Создаем папку, если не существует
+                    if (!Directory.Exists(uploadPath))
                     {
-                        return BadRequest("Недопустимый формат файла");
+                        Directory.CreateDirectory(uploadPath);
                     }
-                    if (photo.Length > 0)
+
+                    foreach (var photo in productDto.Photos)
                     {
-                        // Генерируем уникальное имя файла
-                        var fileName = Guid.NewGuid().ToString() + Path.GetExtension(photo.FileName);
-                        var filePath = Path.Combine("wwwroot/images/products", fileName);
-
-                        // Сохраняем файл на сервер
-                        using (var stream = new FileStream(filePath, FileMode.Create))
+                        try
                         {
-                            await photo.CopyToAsync(stream);
+                            // Валидация файла
+                            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                            var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
+
+                            if (string.IsNullOrEmpty(extension) || !allowedExtensions.Contains(extension))
+                            {
+                                return BadRequest($"Недопустимый формат файла: {photo.FileName}");
+                            }
+
+                            if (photo.Length == 0)
+                                continue;
+
+                            if (photo.Length > 5 * 1024 * 1024) // 5MB
+                                return BadRequest($"Файл слишком большой: {photo.FileName}");
+
+                            // Генерируем уникальное имя файла
+                            var fileName = $"{Guid.NewGuid()}{extension}";
+                            var filePath = Path.Combine(uploadPath, fileName);
+
+                            // Сохраняем файл на сервер
+                            using (var stream = new FileStream(filePath, FileMode.Create))
+                            {
+                                await photo.CopyToAsync(stream);
+                            }
+
+                            // Добавляем запись о фото в БД
+                            product.ProductPhotos.Add(new ProductPhoto
+                            {
+                                ProductPhotoId = Guid.NewGuid(),
+                                PhotoPath = $"/images/products/{fileName}",
+                                ProductId = product.ProductId
+                            });
                         }
-
-                        // Добавляем запись о фото в БД
-                        product.ProductPhotos.Add(new ProductPhoto
+                        catch (Exception ex)
                         {
-                            ProductPhotoId = Guid.NewGuid(),
-                            PhotoPath = $"/images/products/{fileName}",
-                            ProductId = product.ProductId
-                        });
+                            // Логируем ошибку, но продолжаем обработку других файлов
+                            Console.WriteLine($"Ошибка при обработке файла {photo.FileName}: {ex.Message}");
+                        }
                     }
                 }
+
+                await _context.SaveChangesAsync();
+
+                return CreatedAtAction(nameof(GetProduct), new { id = product.ProductId }, product);
             }
-
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetProduct), new { id = product.ProductId }, product);
+            catch (Exception ex)
+            {
+                // Логирование ошибки
+                Console.WriteLine($"Ошибка при создании продукта: {ex}");
+                return StatusCode(500, "Произошла ошибка при создании продукта");
+            }
         }
 
         // PUT: api/products/5
