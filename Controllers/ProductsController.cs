@@ -1,4 +1,5 @@
 ﻿using ArzanGo.Data;
+using ArzanGo.DTO;
 using ArzanGo.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -40,9 +41,60 @@ namespace ArzanGo.Controllers
 
         // POST: api/products
         [HttpPost]
-        public async Task<ActionResult<Product>> PostProduct(Product product)
+        public async Task<ActionResult<Product>> PostProduct([FromForm] ProductDto productDto)
         {
+            // Создаем новый продукт
+            var product = new Product
+            {
+                ProductId = Guid.NewGuid(),
+                Name = productDto.Name,
+                Description = productDto.Description,
+                PurchasePrice = productDto.PurchasePrice,
+                RetailPrice = productDto.RetailPrice,
+                DiscountPrice = productDto.DiscountPrice,
+                CategoryId = productDto.CategoryId,
+                ProductDate = DateTime.Now
+            };
+
             _context.Products.Add(product);
+
+            // Обрабатываем загруженные файлы
+            if (productDto.Photos != null && productDto.Photos.Count > 0)
+            {
+                product.ProductPhotos = new List<ProductPhoto>();
+
+                foreach (var photo in productDto.Photos)
+                {
+                    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                    var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
+
+                    if (string.IsNullOrEmpty(extension) || !allowedExtensions.Contains(extension))
+                    {
+                        return BadRequest("Недопустимый формат файла");
+                    }
+                    if (photo.Length > 0)
+                    {
+                        // Генерируем уникальное имя файла
+                        var fileName = Guid.NewGuid().ToString() + Path.GetExtension(photo.FileName);
+                        var filePath = Path.Combine("wwwroot/images/products", fileName);
+
+                        // Сохраняем файл на сервер
+                        using (var stream = new FileStream(filePath, FileMode.Create))
+                        {
+                            await photo.CopyToAsync(stream);
+                        }
+
+                        // Добавляем запись о фото в БД
+                        product.ProductPhotos.Add(new ProductPhoto
+                        {
+                            ProductPhotoId = Guid.NewGuid(),
+                            PhotoPath = $"/images/products/{fileName}",
+                            ProductId = product.ProductId
+                        });
+                    }
+                }
+            }
+
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetProduct), new { id = product.ProductId }, product);
@@ -82,10 +134,24 @@ namespace ArzanGo.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(Guid id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await _context.Products
+                .Include(p => p.ProductPhotos)
+                .FirstOrDefaultAsync(p => p.ProductId == id);
+
             if (product == null)
             {
                 return NotFound();
+            }
+
+            // Удаляем все связанные фотографии
+            foreach (var photo in product.ProductPhotos)
+            {
+                var filePath = Path.Combine("wwwroot", photo.PhotoPath.TrimStart('/'));
+                if (System.IO.File.Exists(filePath))
+                {
+                    System.IO.File.Delete(filePath);
+                }
+                _context.ProductPhotos.Remove(photo);
             }
 
             _context.Products.Remove(product);
@@ -98,5 +164,69 @@ namespace ArzanGo.Controllers
         {
             return _context.Products.Any(e => e.ProductId == id);
         }
+
+        // PUT: api/products/{id}/photos
+        [HttpPut("{id}/photos")]
+        public async Task<IActionResult> UpdateProductPhotos(Guid id, [FromForm] List<IFormFile> photos)
+        {
+            var product = await _context.Products
+                .Include(p => p.ProductPhotos)
+                .FirstOrDefaultAsync(p => p.ProductId == id);
+
+            if (product == null)
+            {
+                return NotFound();
+            }
+
+            // Удаляем старые фото (опционально)
+            foreach (var photo in product.ProductPhotos)
+            {
+                var filePath = Path.Combine("wwwroot", photo.PhotoPath.TrimStart('/'));
+                if (System.IO.File.Exists(filePath))
+                {
+                    System.IO.File.Delete(filePath);
+                }
+                _context.ProductPhotos.Remove(photo);
+            }
+
+            // Добавляем новые фото
+            if (photos != null && photos.Count > 0)
+            {
+                product.ProductPhotos = new List<ProductPhoto>();
+
+                foreach (var photo in photos)
+                {
+                    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                    var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
+
+                    if (string.IsNullOrEmpty(extension) || !allowedExtensions.Contains(extension))
+                    {
+                        return BadRequest("Недопустимый формат файла");
+                    }
+
+                    if (photo.Length > 0)
+                    {
+                        var fileName = Guid.NewGuid().ToString() + extension;
+                        var filePath = Path.Combine("wwwroot/images/products", fileName);
+
+                        using (var stream = new FileStream(filePath, FileMode.Create))
+                        {
+                            await photo.CopyToAsync(stream);
+                        }
+
+                        product.ProductPhotos.Add(new ProductPhoto
+                        {
+                            ProductPhotoId = Guid.NewGuid(),
+                            PhotoPath = $"/images/products/{fileName}",
+                            ProductId = product.ProductId
+                        });
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok("Фотографии обновлены");
+        }
+
     }
 }

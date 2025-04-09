@@ -25,9 +25,6 @@ namespace ArzanGo.Models
         public Guid CategoryId { get; set; } // Идентификатор категории, к которой принадлежит товар
         public virtual Category? Category { get; set; } // Навигационное свойство для категории товара
 
-        [DisplayName("Загрузите фотографии")]
-        [NotMapped]
-        public List<IFormFile>? Photos { get; set; }
         public virtual ICollection<ProductPhoto>? ProductPhotos { get; set; }
     }
     public class ProductPhoto
