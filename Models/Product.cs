@@ -11,7 +11,7 @@ namespace ArzanGo.Models
         [DisplayName("Дата добавления")]
         [DisplayFormat(DataFormatString = "{0:d}")]
         public DateTime ProductDate { get; set; }
-        public string Name { get; set; } // Название товара
+        public required string Name { get; set; } // Название товара
         public string? Description { get; set; } // Описание товара
         public decimal PurchasePrice { get; set; } // Закупочная цена товара 40
         public decimal RetailPrice { get; set; } // Розничная цена товара 50
@@ -36,8 +36,8 @@ namespace ArzanGo.Models
 
         [DisplayName("Путь к файлу")]
         [StringLength(1200)]
-        public string PhotoPath { get; set; }
+        public required string PhotoPath { get; set; }
         public Guid ProductId { get; set; }
-        public virtual Product Products { get; set; }
+        public virtual Product? Products { get; set; }
     }
 }
