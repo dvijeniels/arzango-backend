@@ -1,6 +1,5 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.DTO;
-using ArzanGo.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,7 +29,7 @@ namespace ArzanGo.Controllers
 
             return new ProductsByCategoriesResponse
             {
-                TotalCategories=result.Count,
+                TotalCategories = result.Count,
                 TotalProducts = result.Sum(x => x.ProductsCount),
                 Categories = result
             };

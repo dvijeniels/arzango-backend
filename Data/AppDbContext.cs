@@ -18,5 +18,6 @@ namespace ArzanGo.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Favorite> Favorites { get; set; }
         public DbSet<Address> Addresses { get; set; }
+        public DbSet<Message> Messages { get; set; }
     }
 }

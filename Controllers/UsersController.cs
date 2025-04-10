@@ -96,16 +96,37 @@ namespace ArzanGo.Controllers
             return NoContent();
         }
 
-
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginModel model)
+        public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
-            // Здесь должна быть ваша логика проверки пользователя
-            if (model.Username != "validUser" || model.Password != "validPassword")
-                return Unauthorized();
+            // 1. Находим пользователя по номеру телефона или email
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == model.Username || u.Password == model.Password);
 
+            if (user == null)
+            {
+                return Unauthorized(new { Message = "Пользователь не найден" });
+            }
+
+            // 2. Проверяем пароль (в реальном проекте используйте хэширование!)
+            if (user.Password != model.Password) // Замените на проверку хэша в реальном проекте
+            {
+                return Unauthorized(new { Message = "Неверный пароль" });
+            }
+
+            // 3. Генерируем JWT токен
             var token = GenerateJwtToken(model.Username);
-            return Ok(new { Token = token });
+
+            return Ok(new
+            {
+                Token = token,
+                UserId = user.UserId,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                PhoneNumber = user.PhoneNumber,
+                Email = user.Email,
+                IsCourier = user.Courier
+            });
         }
 
         private string GenerateJwtToken(string username)
