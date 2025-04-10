@@ -7,6 +7,8 @@
         public string? LastName { get; set; } // Фамилия пользователя
         public required string PhoneNumber { get; set; } // Номер телефона
         public string? Email { get; set; } // Электронная почта
+        public bool? Courier { get; set; } // Является ли Курьером?
+        public record Position(double Latitude, double Longitude);
         public required string Password { get; set; } // Хэш пароля
         public virtual List<Order>? Orders { get; set; } // Список заказов пользователя
         public virtual List<Cart>? Carts { get; set; } 

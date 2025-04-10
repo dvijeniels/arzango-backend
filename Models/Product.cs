@@ -14,6 +14,7 @@ namespace ArzanGo.Models
         public DateTime ProductDate { get; set; }
         public required string Name { get; set; } // Название товара
         public string? Description { get; set; } // Описание товара
+        public int? Stok { get; set; } // Количество товара
         public decimal PurchasePrice { get; set; } // Закупочная цена товара 40
         public decimal RetailPrice { get; set; } // Розничная цена товара 50
 

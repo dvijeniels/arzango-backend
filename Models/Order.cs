@@ -10,8 +10,7 @@ namespace ArzanGo.Models
         public virtual User? Users { get; set; } // Навигационное свойство для пользователя
 
         public Guid CourierId { get; set; } // Идентификатор курьера
-        public virtual Courier? Couriers { get; set; } // Навигационное свойство для курьера
-        public virtual List<OrderItem> OrderItems { get; set; } // Список товаров, заказанных в рамках этого заказа
+        public virtual List<OrderItem>? OrderItems { get; set; } // Список товаров, заказанных в рамках этого заказа
         public decimal TotalAmount { get; set; } // Общая сумма заказа
         public DateTime OrderDate { get; set; } // Дата создания заказа
 

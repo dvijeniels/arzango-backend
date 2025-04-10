@@ -21,7 +21,6 @@ namespace ArzanGo.Controllers
         public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
         {
             return await _context.Orders.Include(o => o.Users)
-                                        .Include(o => o.Couriers)
                                         .Include(o => o.OrderItems)
                                         .ToListAsync();
         }
@@ -31,7 +30,6 @@ namespace ArzanGo.Controllers
         public async Task<ActionResult<Order>> GetOrder(Guid id)
         {
             var order = await _context.Orders.Include(o => o.Users)
-                                             .Include(o => o.Couriers)
                                              .Include(o => o.OrderItems)
                                              .FirstOrDefaultAsync(o => o.OrderId == id);
 
