@@ -24,6 +24,12 @@ namespace ArzanGo.Models
         [NotMapped]
         public decimal FinalPrice => DiscountPrice.HasValue ? DiscountPrice.Value : RetailPrice; //FinalPrice, которое всегда возвращает актуальную цену
 
+        [DisplayName("Показывать на главной")]
+        public bool ShowOnHomePage { get; set; } = false;//ana sayfaya göster
+
+        [DisplayName("Порядок на главной")] //Sıraya göre ana sayfaya göster
+        public int? HomePageDisplayOrder { get; set; }
+
         public Guid CategoryId { get; set; } // Идентификатор категории, к которой принадлежит товар
 
         [JsonIgnore]

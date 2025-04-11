@@ -24,6 +24,12 @@ namespace ArzanGo.Controllers
             return await _context.Products.Include(p => p.Category).Include(p=>p.ProductPhotos).ToListAsync();
         }
 
+        [HttpGet("GetProductsForHomePage")]
+        public async Task<ActionResult<IEnumerable<Product>>> GetProductsForHomePage()
+        {
+            return await _context.Products.Include(p => p.Category).Include(p => p.ProductPhotos).Where(p => p.ShowOnHomePage).OrderBy(p => p.HomePageDisplayOrder).ToListAsync();
+        }
+
         // GET: api/products/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(Guid id)
