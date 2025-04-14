@@ -10,10 +10,12 @@ namespace ArzanGo.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly WebSocketHandler _webSocketHandler;
 
-        public OrdersController(AppDbContext context)
+        public OrdersController(AppDbContext context, WebSocketHandler webSocketHandler)
         {
             _context = context;
+            _webSocketHandler = webSocketHandler;
         }
 
         // ✅ Получить все заказы
@@ -49,6 +51,8 @@ namespace ArzanGo.Controllers
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
+            await _webSocketHandler.BroadcastOrdersUpdateAsync();
+
             return CreatedAtAction(nameof(GetOrder), new { id = order.OrderId }, order);
         }
 
@@ -73,6 +77,7 @@ namespace ArzanGo.Controllers
                     throw;
             }
 
+            await _webSocketHandler.BroadcastOrdersUpdateAsync();
             return NoContent();
         }
 
@@ -86,7 +91,7 @@ namespace ArzanGo.Controllers
 
             _context.Orders.Remove(order);
             await _context.SaveChangesAsync();
-
+            await _webSocketHandler.BroadcastOrdersUpdateAsync();
             return NoContent();
         }
     }
