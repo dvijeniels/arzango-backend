@@ -31,12 +31,30 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddSingleton<WebSocketHandler>();
+builder.Services.AddSingleton<WebSocketHandler>(provider =>
+{
+    var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
+    using var scope = scopeFactory.CreateScope();
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    return new WebSocketHandler(context);
+});
 
 var app = builder.Build();
 
-app.UseWebSockets(); // Включаем поддержку WebSocket
-app.UseMiddleware<WebSocketMiddleware>(); // Добавляем Middleware для WebSocket
+app.UseWebSockets();
+app.Use(async (context, next) =>
+{
+    if (context.WebSockets.IsWebSocketRequest && context.Request.Path == "/ws")
+    {
+        var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+        var handler = app.Services.GetRequiredService<WebSocketHandler>();
+        await handler.HandleWebSocketAsync(webSocket);
+    }
+    else
+    {
+        await next();
+    }
+});
 
 if (app.Environment.IsDevelopment())
 {
@@ -44,7 +62,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "API V1");
-        options.RoutePrefix = string.Empty; // Это позволяет открыть Swagger UI по основному URL, например https://localhost:7146/
+        options.RoutePrefix = string.Empty;
     });
 }
 app.UseCors(builder =>
