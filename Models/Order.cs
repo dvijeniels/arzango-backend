@@ -6,6 +6,7 @@ namespace ArzanGo.Models
     public class Order
     {
         public Guid OrderId { get; set; } // Уникальный идентификатор заказа
+        public string OrderNumber { get; set; } = GenerateOrderNumber();
         public Guid UserId { get; set; } // Идентификатор пользователя, сделавшего заказ
         public virtual User? Users { get; set; } // Навигационное свойство для пользователя
 
@@ -22,7 +23,14 @@ namespace ArzanGo.Models
         [DisplayName("Дополнительно к заказу")]
         public string? Comment { get; set; }
         public Status Status { get; set; } // Статус заказа (например, "В обработке", "Доставлен")
+
+        private static string GenerateOrderNumber()
+        {
+            Random random = new Random();
+            return random.Next(100000, 999999).ToString();
+        }
     }
+    
     public enum Status
     {
         [Display(Name = "В обработке")]
