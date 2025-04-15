@@ -40,27 +40,45 @@ namespace ArzanGo.Controllers
 
         // ✅ Создать новую категорию
         [HttpPost]
-        public async Task<ActionResult<Category>> CreateCategory(Category category, [FromBody] IFormFile? photo)
+        public async Task<ActionResult<Category>> CreateCategory(
+             [FromForm] string name,
+             [FromForm] string? description,
+             [FromForm] IFormFile? photo)
         {
-            category.CategoryId = Guid.NewGuid();
+            var category = new Category
+            {
+                CategoryId = Guid.NewGuid(),
+                Name = name,
+                Description = description
+            };
+
             if (photo != null)
             {
                 category.PhotoPath = await SaveImage(photo);
             }
+
             _context.Categories.Add(category);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetCategory), new { id = category.CategoryId }, category);
         }
 
+
         // ✅ Обновить категорию
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateCategory(Guid id, Category category, [FromForm] IFormFile? photo)
+        public async Task<IActionResult> UpdateCategory(
+            Guid id,
+            [FromForm] string name,
+            [FromForm] string? description,
+            [FromForm] IFormFile? photo)
         {
-            if (id != category.CategoryId)
-                return BadRequest();
+            var category = await _context.Categories.FindAsync(id);
+            if (category == null)
+                return NotFound();
 
-            _context.Entry(category).State = EntityState.Modified;
+            category.Name = name;
+            category.Description = description;
+
             if (photo != null)
             {
                 // Удаляем старое фото если оно есть
@@ -70,6 +88,7 @@ namespace ArzanGo.Controllers
                 }
                 category.PhotoPath = await SaveImage(photo);
             }
+
             try
             {
                 await _context.SaveChangesAsync();
@@ -102,7 +121,7 @@ namespace ArzanGo.Controllers
             return NoContent();
         }
 
-        private async Task<string> SaveImage(IFormFile imageFile)
+        private async Task<string?> SaveImage(IFormFile imageFile)
         {
             if (imageFile == null || imageFile.Length == 0)
                 return null;
