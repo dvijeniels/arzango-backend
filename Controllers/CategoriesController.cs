@@ -10,10 +10,12 @@ namespace ArzanGo.Controllers
     public class CategoriesController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _environment;
 
-        public CategoriesController(AppDbContext context)
+        public CategoriesController(AppDbContext context, IWebHostEnvironment environment)
         {
             _context = context;
+            _environment= environment;
         }
 
         // ✅ Получить все категории
@@ -38,9 +40,13 @@ namespace ArzanGo.Controllers
 
         // ✅ Создать новую категорию
         [HttpPost]
-        public async Task<ActionResult<Category>> CreateCategory(Category category)
+        public async Task<ActionResult<Category>> CreateCategory(Category category, [FromBody] IFormFile? photo)
         {
             category.CategoryId = Guid.NewGuid();
+            if (photo != null)
+            {
+                category.PhotoPath = await SaveImage(photo);
+            }
             _context.Categories.Add(category);
             await _context.SaveChangesAsync();
 
@@ -49,13 +55,21 @@ namespace ArzanGo.Controllers
 
         // ✅ Обновить категорию
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateCategory(Guid id, Category category)
+        public async Task<IActionResult> UpdateCategory(Guid id, Category category, [FromForm] IFormFile? photo)
         {
             if (id != category.CategoryId)
                 return BadRequest();
 
             _context.Entry(category).State = EntityState.Modified;
-
+            if (photo != null)
+            {
+                // Удаляем старое фото если оно есть
+                if (!string.IsNullOrEmpty(category.PhotoPath))
+                {
+                    DeleteImage(category.PhotoPath);
+                }
+                category.PhotoPath = await SaveImage(photo);
+            }
             try
             {
                 await _context.SaveChangesAsync();
@@ -78,11 +92,50 @@ namespace ArzanGo.Controllers
             var category = await _context.Categories.FindAsync(id);
             if (category == null)
                 return NotFound();
-
+            if (!string.IsNullOrEmpty(category.PhotoPath))
+            {
+                DeleteImage(category.PhotoPath);
+            }
             _context.Categories.Remove(category);
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        private async Task<string> SaveImage(IFormFile imageFile)
+        {
+            if (imageFile == null || imageFile.Length == 0)
+                return null;
+
+            // Создаем папку если ее нет
+            var uploadsFolder = Path.Combine(_environment.WebRootPath, "images", "category");
+            if (!Directory.Exists(uploadsFolder))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            // Генерируем уникальное имя файла
+            var uniqueFileName = Guid.NewGuid().ToString() + Path.GetExtension(imageFile.FileName);
+            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await imageFile.CopyToAsync(fileStream);
+            }
+
+            return Path.Combine("images", "category", uniqueFileName).Replace("\\", "/");
+        }
+
+        private void DeleteImage(string imagePath)
+        {
+            if (string.IsNullOrEmpty(imagePath))
+                return;
+
+            var fullPath = Path.Combine(_environment.WebRootPath, imagePath);
+            if (System.IO.File.Exists(fullPath))
+            {
+                System.IO.File.Delete(fullPath);
+            }
         }
     }
 }
