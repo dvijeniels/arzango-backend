@@ -6,6 +6,8 @@ namespace ArzanGo.Models
     {
         public Guid CartItemId { get; set; } // Уникальный идентификатор позиции корзины
         public Guid CartId { get; set; } // Идентификатор корзины
+
+        [JsonIgnore]
         public virtual Cart? Cart { get; set; } // Навигационное свойство для корзины
         public Guid ProductId { get; set; } // Идентификатор товара
 
