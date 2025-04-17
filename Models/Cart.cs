@@ -9,7 +9,6 @@ namespace ArzanGo.Models
 
         [JsonIgnore]
         public virtual User? User { get; set; } // Навигационное свойство для пользователя
-        public Guid CourierId { get; set; } // Идентификатор курьера
 
         [JsonIgnore]
         public virtual List<CartItem>? CartItems { get; set; } // Список товаров в корзине
