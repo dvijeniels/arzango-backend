@@ -1,4 +1,5 @@
 ﻿using ArzanGo.Data;
+using ArzanGo.DTO;
 using ArzanGo.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -40,21 +41,18 @@ namespace ArzanGo.Controllers
 
         // ✅ Создать новую категорию
         [HttpPost]
-        public async Task<ActionResult<Category>> CreateCategory(
-             [FromForm] string name,
-             [FromForm] string? description,
-             [FromForm] IFormFile? photo)
+        public async Task<ActionResult<Category>> CreateCategory([FromForm] CategoryDto dto)
         {
             var category = new Category
             {
                 CategoryId = Guid.NewGuid(),
-                Name = name,
-                Description = description
+                Name = dto.Name,
+                Description = dto.Description
             };
 
-            if (photo != null)
+            if (dto.Photo != null)
             {
-                category.PhotoPath = await SaveImage(photo);
+                category.PhotoPath = await SaveImage(dto.Photo);
             }
 
             _context.Categories.Add(category);
@@ -68,25 +66,23 @@ namespace ArzanGo.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateCategory(
             Guid id,
-            [FromForm] string name,
-            [FromForm] string? description,
-            [FromForm] IFormFile? photo)
+            [FromForm] CategoryDto dto)
         {
             var category = await _context.Categories.FindAsync(id);
             if (category == null)
                 return NotFound();
 
-            category.Name = name;
-            category.Description = description;
+            category.Name = dto.Name;
+            category.Description = dto.Description;
 
-            if (photo != null)
+            if (dto.Photo != null)
             {
                 // Удаляем старое фото если оно есть
                 if (!string.IsNullOrEmpty(category.PhotoPath))
                 {
                     DeleteImage(category.PhotoPath);
                 }
-                category.PhotoPath = await SaveImage(photo);
+                category.PhotoPath = await SaveImage(dto.Photo);
             }
 
             try

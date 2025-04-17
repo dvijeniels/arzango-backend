@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace ArzanGo.Models
 {
@@ -15,6 +16,8 @@ namespace ArzanGo.Models
 
         // Идентификатор пользователя, к которому привязан адрес
         public Guid UserId { get; set; }
+
+        [JsonIgnore]
         public virtual User User { get; set; }
     }
     public enum City

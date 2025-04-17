@@ -1,4 +1,6 @@
-﻿namespace ArzanGo.Models
+﻿using System.Text.Json.Serialization;
+
+namespace ArzanGo.Models
 {
     public class User
     {
@@ -11,9 +13,15 @@
         public bool? Admin { get; set; } // Является ли Админом?
         public record Position(double Latitude, double Longitude);
         public required string Password { get; set; } // Хэш пароля
+
+        [JsonIgnore]
         public virtual List<Order>? Orders { get; set; } // Список заказов пользователя
+
+        [JsonIgnore]
         public virtual List<Cart>? Carts { get; set; } 
         public virtual ICollection<Favorite>? Favorites { get; set; } = new HashSet<Favorite>();
+
+        [JsonIgnore]
         public List<Address>? ShippingAddresses { get; set; }
     }
 }
