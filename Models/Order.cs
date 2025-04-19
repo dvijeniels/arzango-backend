@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace ArzanGo.Models
 {
@@ -8,7 +9,11 @@ namespace ArzanGo.Models
         public Guid OrderId { get; set; } // Уникальный идентификатор заказа
         public string OrderNumber { get; set; } = GenerateOrderNumber();
         public Guid UserId { get; set; } // Идентификатор пользователя, сделавшего заказ
+
+        [JsonIgnore]
         public virtual User? Users { get; set; } // Навигационное свойство для пользователя
+
+        [JsonIgnore]
         public virtual List<OrderItem>? OrderItems { get; set; } // Список товаров, заказанных в рамках этого заказа
         public decimal TotalAmount { get; set; } // Общая сумма заказа
         public DateTime OrderDate { get; set; } // Дата создания заказа
@@ -38,6 +43,8 @@ namespace ArzanGo.Models
         [Display(Name = "В пути")]
         IsOnTheWay,
         [Display(Name = "Доставлен")]
-        IsDelivered
+        IsDelivered,
+        [Display(Name = "Отменён")]
+        Canceled
     }
 }

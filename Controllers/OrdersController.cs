@@ -1,5 +1,6 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.Models;
+using ArzanGo.Models.Requests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,44 +42,71 @@ namespace ArzanGo.Controllers
             return order;
         }
 
-        // ✅ Создать новый заказ
-        [HttpPost]
-        public async Task<ActionResult<Order>> CreateOrder(Order order)
+        [HttpPost("user/{userId}/create-order")]
+        public async Task<ActionResult<Order>> CreateOrder(Guid userId, [FromBody] OrderRequest request)
         {
-            order.OrderId = Guid.NewGuid();
-            order.OrderDate = DateTime.UtcNow;
+            // 1. Получаем корзину пользователя
+            var cart = await _context.Carts
+                .Include(c => c.CartItems)
+                .FirstOrDefaultAsync(c => c.UserId == userId);
 
+            if (cart == null || cart.CartItems == null || !cart.CartItems.Any())
+                return BadRequest("Cart is empty");
+
+            // 2. Создаем заказ
+            var order = new Order
+            {
+                UserId = userId,
+                OrderDate = DateTime.UtcNow,
+                Status = Status.InProcessing,
+                BuyingType = request.BuyingType,
+                Comment = request.Comment,
+                TotalAmount = cart.TotalAmount
+            };
+
+            // 3. Переносим товары из корзины в заказ
+            order.OrderItems = cart.CartItems.Select(ci => new OrderItem
+            {
+                Price = ci.Price,
+                Quantity = ci.Quantity
+            }).ToList();
+
+            // 4. Очищаем корзину (но не удаляем CartItems для истории)
+            cart.CartItems.Clear();
+            cart.TotalAmount = 0;
+
+            // 5. Сохраняем изменения
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
-
             await _webSocketHandler.BroadcastOrdersUpdateAsync();
-
-            return CreatedAtAction(nameof(GetOrder), new { id = order.OrderId }, order);
+            return Ok(order);
         }
 
-        // ✅ Обновить заказ
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateOrder(Guid id, Order order)
+        [HttpPost("{orderId}/cancel")]
+        public async Task<IActionResult> CancelOrder(Guid orderId)
         {
-            if (id != order.OrderId)
-                return BadRequest();
+            var order = await _context.Orders
+                .Include(o => o.OrderItems)
+                .ThenInclude(ci => ci.Product)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
-            _context.Entry(order).State = EntityState.Modified;
+            if (order == null) return NotFound();
+            if (order.Status != Status.InProcessing)
+                return BadRequest("Order cannot be canceled");
 
-            try
+            // Возвращаем товары на склад
+            foreach (var item in order.OrderItems)
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Orders.Any(e => e.OrderId == id))
-                    return NotFound();
-                else
-                    throw;
+                if (item?.Product != null)
+                {
+                    item.Product.Stok += item.Quantity;
+                }
             }
 
+            order.Status = Status.Canceled;
+            await _context.SaveChangesAsync();
             await _webSocketHandler.BroadcastOrdersUpdateAsync();
-            return NoContent();
+            return Ok();
         }
 
         // ✅ Удалить заказ
