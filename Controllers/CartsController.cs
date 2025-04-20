@@ -61,54 +61,79 @@ namespace ArzanGo.Controllers
 
         // Добавить товар в корзину
         [HttpPost("user/{userId}/items")]
-        public async Task<ActionResult<Cart>> AddToCart(Guid userId, [FromBody] AddToCartRequest request)// sonra bu metodla itemleri olusturuyoruz
+        public async Task<ActionResult<Cart>> AddToCart(Guid userId, [FromBody] AddToCartRequest request)
         {
-            // 1. Bir kullanıcının sepetini bulun veya oluşturun
-            var cart = await _context.Carts
-                .Include(c => c.CartItems)
-                .FirstOrDefaultAsync(c => c.UserId == userId)
-                ?? new Cart { UserId = userId };
+            // 1. Валидация запроса
+            if (request == null)
+                return BadRequest("Request cannot be null");
 
-            if (cart.CartId == Guid.Empty)
+            if (request.Quantity <= 0)
+                return BadRequest("Quantity must be positive");
+
+            try
             {
-                _context.Carts.Add(cart);
-                await _context.SaveChangesAsync();
-            }
+                // 2. Получаем или создаем корзину
+                var cart = await _context.Carts
+                    .Include(c => c.CartItems)
+                    .FirstOrDefaultAsync(c => c.UserId == userId);
 
-            // 2. Ürünü bulun
-            var product = await _context.Products.FindAsync(request.ProductId);
-            if (product == null) return NotFound("Product not found");
-
-            // 3. Sepette böyle bir ürün olup olmadığını kontrol edin
-            var existingItem = cart.CartItems?.FirstOrDefault(ci => ci.ProductId == request.ProductId);
-
-            if (existingItem != null)
-            {
-                // Ürün zaten sepetteyse miktarı artırın
-                existingItem.Quantity += request.Quantity;
-            }
-            else
-            {
-                // Yeni bir sepet öğesi oluştur
-                var newItem = new CartItem
+                if (cart == null)
                 {
-                    CartItemId = Guid.NewGuid(),
-                    CartId = cart.CartId,
-                    ProductId = product.ProductId,
-                    Quantity = request.Quantity,
-                    Price = product.FinalPrice
-                };
+                    cart = new Cart
+                    {
+                        CartId = Guid.NewGuid(),
+                        UserId = userId,
+                        CartItems = new List<CartItem>(),
+                        TotalAmount = 0
+                    };
+                    _context.Carts.Add(cart);
+                    await _context.SaveChangesAsync();
+                }
+                else
+                {
+                    // Инициализируем CartItems если null
+                    cart.CartItems ??= new List<CartItem>();
+                }
 
-                cart.CartItems ??= new List<CartItem>();
-                cart.CartItems.Add(newItem);
+                // 3. Проверяем товар
+                var product = await _context.Products.FindAsync(request.ProductId);
+                if (product == null)
+                    return NotFound("Product not found");
+
+                // 4. Вычисляем конечную цену
+                var finalPrice = product.DiscountPrice ?? product.RetailPrice;
+
+                // 5. Ищем товар в корзине
+                var existingItem = cart.CartItems.FirstOrDefault(ci => ci.ProductId == request.ProductId);
+
+                if (existingItem != null)
+                {
+                    existingItem.Quantity += request.Quantity;
+                    existingItem.Price = finalPrice; // Обновляем цену на случай изменения
+                }
+                else
+                {
+                    var newItem = new CartItem
+                    {
+                        CartItemId = Guid.NewGuid(),
+                        CartId = cart.CartId,
+                        ProductId = product.ProductId,
+                        Quantity = request.Quantity,
+                        Price = finalPrice
+                    };
+                    cart.CartItems.Add(newItem);
+                }
+
+                // 6. Пересчитываем сумму (с защитой от null)
+                cart.TotalAmount = cart.CartItems.Sum(ci => ci.Price * ci.Quantity);
+
+                await _context.SaveChangesAsync();
+                return Ok(cart);
             }
-
-            // 4. Toplam tutarı yeniden hesaplıyoruz
-            cart.TotalAmount = cart.CartItems.Sum(ci => ci.Price * ci.Quantity);
-
-            await _context.SaveChangesAsync();
-
-            return Ok(cart);
+            catch (Exception)
+            {
+                return StatusCode(500, "An error occurred while processing your request");
+            }
         }
 
         // Удалить товар из корзины
@@ -120,23 +145,41 @@ namespace ArzanGo.Controllers
                 .Include(c => c.CartItems)
                 .FirstOrDefaultAsync(c => c.UserId == userId);
 
-            if (cart == null) return NotFound("Cart not found");
+            if (cart == null)
+                return NotFound("Корзина не найдена");
 
-            // 2. Находим удаляемый товар в корзине
-            var itemToRemove = cart.CartItems?.FirstOrDefault(ci => ci.ProductId == productId);
-            if (itemToRemove == null) return NotFound("Item not found in cart");
+            // 2. Проверяем наличие товаров в корзине
+            if (cart.CartItems == null || !cart.CartItems.Any())
+                return NotFound("Корзина пуста");
 
-            // 3. Удаляем товар из корзины
+            // 3. Находим удаляемый товар в корзине
+            var itemToRemove = cart.CartItems.FirstOrDefault(ci => ci.ProductId == productId);
+            if (itemToRemove == null)
+                return NotFound("Товар не найден в корзине");
+
+            // 4. Удаляем товар из корзины
             _context.CartItems.Remove(itemToRemove);
 
-            // 4. Пересчитываем общую сумму
+            // 5. Пересчитываем общую сумму (исключая удаленный товар)
             cart.TotalAmount = cart.CartItems
-                .Where(ci => ci.CartItemId != itemToRemove.CartItemId)
+                .Except(new[] { itemToRemove }) // Безопасный способ исключить элемент
                 .Sum(ci => ci.Price * ci.Quantity);
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
 
-            return Ok(cart);
+                // Возвращаем обновленную корзину
+                var updatedCart = await _context.Carts
+                    .Include(c => c.CartItems)
+                    .FirstAsync(c => c.CartId == cart.CartId);
+
+                return Ok(updatedCart);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Ошибка при удалении товара из корзины");
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.Models;
 using ArzanGo.Models.Request;
+using ArzanGo.Models.Requests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -95,6 +96,36 @@ namespace ArzanGo.Controllers
 
             return NoContent();
         }
+        [HttpPost("register")]
+        public async Task<ActionResult<User>> Register(UserRegisterModel model)
+        {
+            // Проверка на существующего пользователя
+            if (await _context.Users.AnyAsync(u => u.Email == model.Email))
+                return BadRequest("Пользователь с таким email уже существует");
+
+            if (!string.IsNullOrEmpty(model.PhoneNumber))
+            {
+                if (await _context.Users.AnyAsync(u => u.PhoneNumber == model.PhoneNumber))
+                    return BadRequest("Пользователь с таким номером телефона уже существует");
+            }
+
+            // Создаем нового пользователя
+            var user = new User
+            {
+                UserId = Guid.NewGuid(),
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                Email = model.Email,
+                PhoneNumber = model.PhoneNumber,
+                Password = model.Password, // В реальном проекте нужно хэшировать пароль!
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetUser), new { id = user.UserId }, user);
+        }
+
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginModel model)

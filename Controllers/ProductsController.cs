@@ -187,15 +187,25 @@ namespace ArzanGo.Controllers
                 return NotFound();
             }
 
-            // Удаляем все связанные фотографии
-            foreach (var photo in product.ProductPhotos)
+            // Safely handle product photos deletion
+            if (product.ProductPhotos != null)
             {
-                var filePath = Path.Combine("wwwroot", photo.PhotoPath.TrimStart('/'));
-                if (System.IO.File.Exists(filePath))
+                foreach (var photo in product.ProductPhotos)
                 {
-                    System.IO.File.Delete(filePath);
+                    if (photo?.PhotoPath != null)
+                    {
+                        var filePath = Path.Combine("wwwroot", photo.PhotoPath.TrimStart('/'));
+                        if (System.IO.File.Exists(filePath))
+                        {
+                            System.IO.File.Delete(filePath);
+                        }
+                    }
+
+                    if (photo != null)
+                    {
+                        _context.ProductPhotos.Remove(photo);
+                    }
                 }
-                _context.ProductPhotos.Remove(photo);
             }
 
             _context.Products.Remove(product);
@@ -211,48 +221,71 @@ namespace ArzanGo.Controllers
 
         // PUT: api/products/{id}/photos
         [HttpPut("{id}/photos")]
-        public async Task<IActionResult> UpdateProductPhotos(Guid id, [FromForm] List<IFormFile> photos)
+        public async Task<IActionResult> UpdateProductPhotos(Guid id, [FromForm] List<IFormFile>? photos)
         {
+            // Validate input
+            if (photos == null)
+            {
+                return BadRequest("No photos provided");
+            }
+
             var product = await _context.Products
                 .Include(p => p.ProductPhotos)
                 .FirstOrDefaultAsync(p => p.ProductId == id);
 
             if (product == null)
             {
-                return NotFound();
+                return NotFound("Product not found");
             }
 
-            // Удаляем старые фото (опционально)
-            foreach (var photo in product.ProductPhotos)
+            // Safely remove old photos
+            if (product.ProductPhotos != null)
             {
-                var filePath = Path.Combine("wwwroot", photo.PhotoPath.TrimStart('/'));
-                if (System.IO.File.Exists(filePath))
+                foreach (var photo in product.ProductPhotos)
                 {
-                    System.IO.File.Delete(filePath);
+                    if (photo?.PhotoPath != null)
+                    {
+                        var filePath = Path.Combine("wwwroot", photo.PhotoPath.TrimStart('/'));
+                        if (System.IO.File.Exists(filePath))
+                        {
+                            System.IO.File.Delete(filePath);
+                        }
+                    }
+
+                    if (photo != null)
+                    {
+                        _context.ProductPhotos.Remove(photo);
+                    }
                 }
-                _context.ProductPhotos.Remove(photo);
             }
 
-            // Добавляем новые фото
-            if (photos != null && photos.Count > 0)
+            // Process new photos
+            if (photos.Count > 0)
             {
-                product.ProductPhotos = new List<ProductPhoto>();
+                product.ProductPhotos ??= new List<ProductPhoto>();
+                var uploadPath = Path.Combine("wwwroot", "images", "products");
+
+                // Ensure directory exists
+                Directory.CreateDirectory(uploadPath);
 
                 foreach (var photo in photos)
                 {
+                    if (photo == null || photo.Length == 0)
+                        continue;
+
                     var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
-                    var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
+                    var extension = Path.GetExtension(photo.FileName)?.ToLowerInvariant();
 
                     if (string.IsNullOrEmpty(extension) || !allowedExtensions.Contains(extension))
                     {
-                        return BadRequest("Недопустимый формат файла");
+                        return BadRequest($"Invalid file format: {photo.FileName}");
                     }
 
-                    if (photo.Length > 0)
-                    {
-                        var fileName = Guid.NewGuid().ToString() + extension;
-                        var filePath = Path.Combine("wwwroot/images/products", fileName);
+                    var fileName = $"{Guid.NewGuid()}{extension}";
+                    var filePath = Path.Combine(uploadPath, fileName);
 
+                    try
+                    {
                         using (var stream = new FileStream(filePath, FileMode.Create))
                         {
                             await photo.CopyToAsync(stream);
@@ -265,12 +298,22 @@ namespace ArzanGo.Controllers
                             ProductId = product.ProductId
                         });
                     }
+                    catch (Exception ex)
+                    {
+                        return StatusCode(500, $"Error uploading {photo.FileName}: {ex.Message}");
+                    }
                 }
             }
 
-            await _context.SaveChangesAsync();
-            return Ok("Фотографии обновлены");
+            try
+            {
+                await _context.SaveChangesAsync();
+                return Ok("Photos updated successfully");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error saving changes: {ex.Message}");
+            }
         }
-
     }
 }

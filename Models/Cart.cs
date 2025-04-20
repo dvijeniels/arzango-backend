@@ -10,8 +10,7 @@ namespace ArzanGo.Models
         [JsonIgnore]
         public virtual User? User { get; set; } // Навигационное свойство для пользователя
 
-        [JsonIgnore]
-        public virtual List<CartItem>? CartItems { get; set; } // Список товаров в корзине
+        public virtual ICollection<CartItem>? CartItems { get; set; } // Список товаров в корзине
         public decimal TotalAmount { get; set; } // Общая сумма корзины
     }
 

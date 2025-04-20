@@ -23,7 +23,7 @@ namespace ArzanGo.Controllers
                 {
                     CategoryId = c.CategoryId,
                     CategoryName = c.Name,
-                    ProductsCount = c.Products.Count
+                    ProductsCount = c.Products != null ? c.Products.Count : 0
                 })
                 .ToListAsync();
 

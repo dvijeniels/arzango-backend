@@ -86,7 +86,7 @@ namespace ArzanGo.Controllers
         public async Task<IActionResult> CancelOrder(Guid orderId)
         {
             var order = await _context.Orders
-                .Include(o => o.OrderItems)
+                .Include(o => o.OrderItems!)
                 .ThenInclude(ci => ci.Product)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
@@ -95,7 +95,7 @@ namespace ArzanGo.Controllers
                 return BadRequest("Order cannot be canceled");
 
             // Возвращаем товары на склад
-            foreach (var item in order.OrderItems)
+            foreach (var item in order.OrderItems!)
             {
                 if (item?.Product != null)
                 {
