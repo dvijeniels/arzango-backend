@@ -23,6 +23,7 @@ namespace ArzanGo.Controllers
             return await _context.Favorites
                 .Where(f => f.UserId == userId)
                 .Include(f => f.Product)
+                .ThenInclude(p => p != null ? p.ProductPhotos : null)
                 .ToListAsync();
         }
 

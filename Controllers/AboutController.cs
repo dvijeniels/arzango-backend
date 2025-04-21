@@ -18,16 +18,10 @@ namespace ArzanGo.Controllers
 
         // ✅ Получить информацию "О нас"
         [HttpGet]
-        public async Task<ActionResult<About>> GetAbout()
+        public async Task<ActionResult<About?>> GetAbout()
         {
             var about = await _context.About.FirstOrDefaultAsync();
-
-            if (about == null)
-            {
-                return NotFound("About information not found");
-            }
-
-            return about;
+            return about == null ? NotFound("About information not found") : about;
         }
 
         // ✅ Обновить информацию "О нас"

@@ -7,8 +7,8 @@ namespace ArzanGo.Models
     {
         public Guid AddressId { get; set; } // Уникальный идентификатор адреса
         public City City { get; set; } // Город (перечисление)
-        public string Street { get; set; } // Улица
-        public string House { get; set; } // Дом
+        public required string Street { get; set; } // Улица
+        public required string House { get; set; } // Дом
         public string? Additionally { get; set; } // Номер квартиры, Подъезд
 
         [RegularExpression(@"^\d{6}$", ErrorMessage = "Неверный формат почтового индекса")]

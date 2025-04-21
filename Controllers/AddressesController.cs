@@ -1,12 +1,13 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace ArzanGo.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
-    [ApiController]
     public class AddressesController : ControllerBase
     {
         private readonly AppDbContext _context;

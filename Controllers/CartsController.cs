@@ -100,16 +100,12 @@ namespace ArzanGo.Controllers
                 if (product == null)
                     return NotFound("Product not found");
 
-                // 4. Вычисляем конечную цену
-                var finalPrice = product.DiscountPrice ?? product.RetailPrice;
-
                 // 5. Ищем товар в корзине
                 var existingItem = cart.CartItems.FirstOrDefault(ci => ci.ProductId == request.ProductId);
 
                 if (existingItem != null)
                 {
                     existingItem.Quantity += request.Quantity;
-                    existingItem.Price = finalPrice; // Обновляем цену на случай изменения
                 }
                 else
                 {
@@ -119,8 +115,9 @@ namespace ArzanGo.Controllers
                         CartId = cart.CartId,
                         ProductId = product.ProductId,
                         Quantity = request.Quantity,
-                        Price = finalPrice
+                        Price = product.FinalPrice
                     };
+                    _context.CartItems.Add(newItem);
                     cart.CartItems.Add(newItem);
                 }
 
