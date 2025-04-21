@@ -22,7 +22,8 @@ namespace ArzanGo.Controllers
         public async Task<ActionResult<IEnumerable<Cart>>> GetCarts()
         {
             return await _context.Carts.Include(c => c.User)
-                                       .Include(c => c.CartItems)
+                                       .Include(c => c.CartItems!)
+                                       .ThenInclude(p=>p.Product)
                                        .ToListAsync();
         }
 
