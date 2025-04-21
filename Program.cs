@@ -6,7 +6,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddDbContext<AppDbContext>(options =>
+// Добавьте эту строку вместо builder.Services.AddDbContext(...)
+builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -42,10 +43,8 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<WebSocketHandler>(provider =>
 {
-    var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-    using var scope = scopeFactory.CreateScope();
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    return new WebSocketHandler(context);
+    var contextFactory = provider.GetRequiredService<IDbContextFactory<AppDbContext>>();
+    return new WebSocketHandler(contextFactory);
 });
 
 var app = builder.Build();

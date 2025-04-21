@@ -8,11 +8,11 @@ using System.Text.Json;
 public class WebSocketHandler
 {
     private static readonly ConcurrentDictionary<string, WebSocket> _clients = new();
-    private readonly AppDbContext _context;
+    private readonly IDbContextFactory<AppDbContext> _contextFactory;
 
-    public WebSocketHandler(AppDbContext context)
+    public WebSocketHandler(IDbContextFactory<AppDbContext> contextFactory)
     {
-        _context = context;
+        _contextFactory = contextFactory;
     }
 
     public async Task HandleWebSocketAsync(WebSocket webSocket)
@@ -56,7 +56,8 @@ public class WebSocketHandler
 
     private async Task SendAllOrdersAsync(WebSocket webSocket)
     {
-        var orders = await _context.Orders
+        await using var context = _contextFactory.CreateDbContext();
+        var orders = await context.Orders
             .Include(o => o.Users)
             .Include(o => o.OrderItems)
             .ToListAsync();
@@ -73,7 +74,8 @@ public class WebSocketHandler
 
     public async Task BroadcastOrdersUpdateAsync()
     {
-        var orders = await _context.Orders
+        await using var context = _contextFactory.CreateDbContext();
+        var orders = await context.Orders
             .Include(o => o.Users)
             .Include(o => o.OrderItems)
             .ToListAsync();

@@ -67,6 +67,7 @@ namespace ArzanGo.Controllers
             // 3. Переносим товары из корзины в заказ
             order.OrderItems = cart.CartItems.Select(ci => new OrderItem
             {
+                ProductId = ci.ProductId,
                 Price = ci.Price,
                 Quantity = ci.Quantity
             }).ToList();
