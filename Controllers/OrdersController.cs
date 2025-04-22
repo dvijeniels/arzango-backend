@@ -23,7 +23,7 @@ namespace ArzanGo.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
         {
-            return await _context.Orders.Include(o => o.Users)
+            return await _context.Orders.Include(o => o.Users).Include(o => o.Address)
                                         .Include(o => o.OrderItems)
                                         .ToListAsync();
         }
@@ -32,7 +32,7 @@ namespace ArzanGo.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Order>> GetOrder(Guid id)
         {
-            var order = await _context.Orders.Include(o => o.Users)
+            var order = await _context.Orders.Include(o => o.Users).Include(o => o.Address)
                                              .Include(o => o.OrderItems)
                                              .FirstOrDefaultAsync(o => o.OrderId == id);
 
@@ -61,6 +61,7 @@ namespace ArzanGo.Controllers
                 Status = Status.InProcessing,
                 BuyingType = request.BuyingType,
                 Comment = request.Comment,
+                AddressId = request.AddressId,
                 TotalAmount = cart.TotalAmount
             };
 

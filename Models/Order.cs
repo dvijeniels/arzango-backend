@@ -13,6 +13,11 @@ namespace ArzanGo.Models
         [JsonIgnore]
         public virtual User? Users { get; set; } // Навигационное свойство для пользователя
 
+        public Guid AddressId { get; set; } // Идентификатор пользователя, сделавшего заказ
+
+        [JsonIgnore]
+        public virtual Address? Address { get; set; } // Навигационное свойство для пользователя
+
         [JsonIgnore]
         public virtual List<OrderItem>? OrderItems { get; set; } // Список товаров, заказанных в рамках этого заказа
         public decimal TotalAmount { get; set; } // Общая сумма заказа
