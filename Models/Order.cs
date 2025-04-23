@@ -6,17 +6,17 @@ namespace ArzanGo.Models
 {
     public class Order
     {
-        public Guid OrderId { get; set; } // Уникальный идентификатор заказа
+        public Guid OrderId { get; set; }
         public string OrderNumber { get; set; } = GenerateOrderNumber();
-        public Guid UserId { get; set; } // Идентификатор пользователя, сделавшего заказ
+        public Guid UserId { get; set; } 
 
         [JsonIgnore]
-        public virtual User? Users { get; set; } // Навигационное свойство для пользователя
+        public virtual User? Users { get; set; }
 
-        public Guid AddressId { get; set; } // Идентификатор пользователя, сделавшего заказ
+        public Guid AddressId { get; set; } 
 
         [JsonIgnore]
-        public virtual Address? Address { get; set; } // Навигационное свойство для пользователя
+        public virtual Address? Address { get; set; }
 
         [JsonIgnore]
         public virtual List<OrderItem>? OrderItems { get; set; } // Список товаров, заказанных в рамках этого заказа

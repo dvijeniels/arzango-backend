@@ -1,12 +1,12 @@
 using ArzanGo.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
-// Добавьте эту строку вместо builder.Services.AddDbContext(...)
+
+
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -26,6 +26,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
+
+        //options.Events = new JwtBearerEvents
+        //{
+        //    OnMessageReceived = context =>
+        //    {
+        //        var accessToken = context.Request.Query["access_token"];
+        //        if (!string.IsNullOrEmpty(accessToken) &&
+        //            context.HttpContext.Request.Path.StartsWithSegments("/ws"))
+        //        {
+        //            context.Token = accessToken;
+        //        }
+        //        return Task.CompletedTask;
+        //    }
+        //};
     });
 
 // Добавляем политику, требующую аутентификацию по умолчанию

@@ -8,6 +8,7 @@ using System.Text.Json;
 public class WebSocketHandler
 {
     private static readonly ConcurrentDictionary<string, WebSocket> _clients = new();
+    private static readonly ConcurrentDictionary<Guid, string> _userConnections = new(); // Для связи userId → WebSocket
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
 
     public WebSocketHandler(IDbContextFactory<AppDbContext> contextFactory)
@@ -15,10 +16,15 @@ public class WebSocketHandler
         _contextFactory = contextFactory;
     }
 
-    public async Task HandleWebSocketAsync(WebSocket webSocket)
+    public async Task HandleWebSocketAsync(WebSocket webSocket, Guid? userId = null)
     {
         var clientId = Guid.NewGuid().ToString();
         _clients.TryAdd(clientId, webSocket);
+
+        if (userId.HasValue)
+        {
+            _userConnections.TryAdd(userId.Value, clientId); // Связываем userId с WebSocket
+        }
 
         try
         {
@@ -36,14 +42,14 @@ public class WebSocketHandler
                     {
                         await SendAllOrdersAsync(webSocket);
                     }
-                    else
-                    {
-                        await BroadcastMessageAsync(message);
-                    }
                 }
                 else if (result.MessageType == WebSocketMessageType.Close)
                 {
                     _clients.TryRemove(clientId, out _);
+                    if (userId.HasValue)
+                    {
+                        _userConnections.TryRemove(userId.Value, out _);
+                    }
                     await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed", CancellationToken.None);
                 }
             }
@@ -51,9 +57,14 @@ public class WebSocketHandler
         finally
         {
             _clients.TryRemove(clientId, out _);
+            if (userId.HasValue)
+            {
+                _userConnections.TryRemove(userId.Value, out _);
+            }
         }
     }
 
+    // Отправка списка заказов (как было)
     private async Task SendAllOrdersAsync(WebSocket webSocket)
     {
         await using var context = _contextFactory.CreateDbContext();
@@ -72,6 +83,7 @@ public class WebSocketHandler
             CancellationToken.None);
     }
 
+    // Рассылка обновлений заказов (как было)
     public async Task BroadcastOrdersUpdateAsync()
     {
         await using var context = _contextFactory.CreateDbContext();
@@ -81,18 +93,10 @@ public class WebSocketHandler
             .ToListAsync();
 
         var ordersJson = JsonSerializer.Serialize(orders);
-        var buffer = Encoding.UTF8.GetBytes(ordersJson);
-        var segment = new ArraySegment<byte>(buffer);
-
-        foreach (var client in _clients.Values.ToList())
-        {
-            if (client.State == WebSocketState.Open)
-            {
-                await client.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
-            }
-        }
+        await BroadcastMessageAsync(ordersJson);
     }
 
+    // Отправка сообщения всем клиентам
     private static async Task BroadcastMessageAsync(string message)
     {
         var bytes = Encoding.UTF8.GetBytes(message);
@@ -104,6 +108,22 @@ public class WebSocketHandler
             {
                 await client.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
             }
+        }
+    }
+
+    // 🔥 Новый метод: Отправка уведомления конкретному пользователю
+    public async Task SendNotificationToUserAsync(Guid userId, string message)
+    {
+        if (_userConnections.TryGetValue(userId, out var clientId) &&
+            _clients.TryGetValue(clientId, out var webSocket) &&
+            webSocket.State == WebSocketState.Open)
+        {
+            var buffer = Encoding.UTF8.GetBytes(message);
+            await webSocket.SendAsync(
+                new ArraySegment<byte>(buffer),
+                WebSocketMessageType.Text,
+                true,
+                CancellationToken.None);
         }
     }
 }

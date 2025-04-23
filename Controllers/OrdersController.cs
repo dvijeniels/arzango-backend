@@ -80,6 +80,10 @@ namespace ArzanGo.Controllers
             // 5. Сохраняем изменения
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
+
+            await _webSocketHandler.SendNotificationToUserAsync(userId,
+                $"Ваш заказ #{order.OrderNumber} создан! Статус: {order.Status}");
+
             await _webSocketHandler.BroadcastOrdersUpdateAsync();
             return Ok(order);
         }
@@ -107,6 +111,8 @@ namespace ArzanGo.Controllers
 
             order.Status = Status.Canceled;
             await _context.SaveChangesAsync();
+            await _webSocketHandler.SendNotificationToUserAsync(order.UserId,
+                $"Заказ #{order.OrderNumber} отменён.");
             await _webSocketHandler.BroadcastOrdersUpdateAsync();
             return Ok();
         }
@@ -121,6 +127,9 @@ namespace ArzanGo.Controllers
 
             _context.Orders.Remove(order);
             await _context.SaveChangesAsync();
+            await _webSocketHandler.SendNotificationToUserAsync(order.UserId,
+                $"Заказ #{order.OrderNumber} удалён администратором.");
+
             await _webSocketHandler.BroadcastOrdersUpdateAsync();
             return NoContent();
         }

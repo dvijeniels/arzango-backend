@@ -134,7 +134,7 @@ namespace ArzanGo.Controllers
             }
         }
 
-        // Удалить товар из корзины
+        // Удалить товар из корзины (или уменьшить количество на 1)
         [HttpDelete("user/{userId}/items/{productId}")]
         public async Task<ActionResult<Cart>> RemoveFromCart(Guid userId, Guid productId)
         {
@@ -144,7 +144,7 @@ namespace ArzanGo.Controllers
                 .FirstOrDefaultAsync(c => c.UserId == userId);
 
             if (cart == null)
-                return NotFound("Корзина не найдена");
+                return NotFound("Cart not found");
 
             // 2. Проверяем наличие товаров в корзине
             if (cart.CartItems == null || !cart.CartItems.Any())
@@ -153,15 +153,22 @@ namespace ArzanGo.Controllers
             // 3. Находим удаляемый товар в корзине
             var itemToRemove = cart.CartItems.FirstOrDefault(ci => ci.ProductId == productId);
             if (itemToRemove == null)
-                return NotFound("Товар не найден в корзине");
+                return NotFound("Product not found in cart");
 
-            // 4. Удаляем товар из корзины
-            _context.CartItems.Remove(itemToRemove);
+            // 4. Проверяем количество товаров
+            if (itemToRemove.Quantity > 1)
+            {
+                // Уменьшаем количество на 1
+                itemToRemove.Quantity -= 1;
+            }
+            else
+            {
+                // Удаляем товар полностью, если он последний
+                _context.CartItems.Remove(itemToRemove);
+            }
 
-            // 5. Пересчитываем общую сумму (исключая удаленный товар)
-            cart.TotalAmount = cart.CartItems
-                .Except(new[] { itemToRemove }) // Безопасный способ исключить элемент
-                .Sum(ci => ci.Price * ci.Quantity);
+            // 5. Пересчитываем общую сумму
+            cart.TotalAmount = cart.CartItems.Sum(ci => ci.Price * ci.Quantity);
 
             try
             {
@@ -176,7 +183,45 @@ namespace ArzanGo.Controllers
             }
             catch (Exception)
             {
-                return StatusCode(500, "Ошибка при удалении товара из корзины");
+                return StatusCode(500, "Error while changing cart");
+            }
+        }
+        // Полностью очистить корзину пользователя
+        [HttpDelete("user/{userId}/clear")]
+        public async Task<ActionResult<Cart>> ClearCart(Guid userId)
+        {
+            // 1. Находим корзину пользователя
+            var cart = await _context.Carts
+                .Include(c => c.CartItems)
+                .FirstOrDefaultAsync(c => c.UserId == userId);
+
+            if (cart == null)
+                return NotFound("Cart not found");
+
+            // 2. Проверяем, есть ли товары в корзине
+            if (cart.CartItems == null || !cart.CartItems.Any())
+                return Ok("The cart is already empty");
+
+            // 3. Удаляем все товары из корзины
+            _context.CartItems.RemoveRange(cart.CartItems);
+
+            // 4. Обнуляем общую сумму
+            cart.TotalAmount = 0;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+
+                // Возвращаем обновленную (пустую) корзину
+                var updatedCart = await _context.Carts
+                    .Include(c => c.CartItems)
+                    .FirstAsync(c => c.CartId == cart.CartId);
+
+                return Ok(updatedCart);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Error emptying recycle bin");
             }
         }
     }

@@ -19,6 +19,9 @@ namespace ArzanGo.Models
 
         [JsonIgnore]
         public virtual User? User { get; set; }
+
+        [JsonIgnore]
+        public virtual ICollection<Order>? Orders { get; set; }
     }
     public enum City
     {
