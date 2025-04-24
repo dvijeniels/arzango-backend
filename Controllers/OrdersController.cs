@@ -23,7 +23,7 @@ namespace ArzanGo.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
         {
-            return await _context.Orders.Include(o => o.Users).Include(o => o.Address)
+            return await _context.Orders.Include(o => o.Users).Include(o => o.Address).Include(o => o.PaymentSettings)
                                         .Include(o => o.OrderItems)
                                         .ToListAsync();
         }
@@ -32,7 +32,7 @@ namespace ArzanGo.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Order>> GetOrder(Guid id)
         {
-            var order = await _context.Orders.Include(o => o.Users).Include(o => o.Address)
+            var order = await _context.Orders.Include(o => o.Users).Include(o => o.Address).Include(o => o.PaymentSettings)
                                              .Include(o => o.OrderItems)
                                              .FirstOrDefaultAsync(o => o.OrderId == id);
 
@@ -40,6 +40,20 @@ namespace ArzanGo.Controllers
                 return NotFound();
 
             return order;
+        }
+        // ✅ Получить все заказы пользователя
+        [HttpGet("user/{userId}")]
+        public async Task<ActionResult<IEnumerable<Order>>> GetOrdersByUser(Guid userId)
+        {
+            var orders = await _context.Orders
+                .Include(o => o.Users)
+                .Include(o => o.PaymentSettings)
+                .Include(o => o.Address)
+                .Include(o => o.OrderItems)
+                .Where(o => o.UserId == userId)
+                .ToListAsync();
+
+            return Ok(orders);
         }
 
         [HttpPost("user/{userId}/create-order")]
@@ -59,7 +73,7 @@ namespace ArzanGo.Controllers
                 UserId = userId,
                 OrderDate = DateTime.UtcNow,
                 Status = Status.InProcessing,
-                BuyingType = request.BuyingType,
+                PaymentMethodId = request.PaymentMethodId,
                 Comment = request.Comment,
                 AddressId = request.AddressId,
                 TotalAmount = cart.TotalAmount
@@ -93,7 +107,7 @@ namespace ArzanGo.Controllers
         {
             var order = await _context.Orders
                 .Include(o => o.OrderItems!)
-                .ThenInclude(ci => ci.Product)
+                .ThenInclude(ci => ci.Product).Include(o => o.PaymentSettings).Include(o => o.Users).Include(o => o.Address)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
             if (order == null) return NotFound();

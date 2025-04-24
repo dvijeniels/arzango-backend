@@ -20,6 +20,7 @@ namespace ArzanGo.Data
         public DbSet<Address> Addresses { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<PaymentSettings> PaymentSettings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

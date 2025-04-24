@@ -23,9 +23,12 @@ namespace ArzanGo.Models
         public decimal TotalAmount { get; set; } // Общая сумма заказа
         public DateTime OrderDate { get; set; } // Дата создания заказа
 
-        [StringLength(20)]
         [DisplayName("Вид оплаты")]
-        public string? BuyingType { get; set; }
+        public Guid PaymentMethodId { get; set; } // ID метода оплаты
+
+        [JsonIgnore]
+        [DisplayName("Вид оплаты")]
+        public virtual PaymentSettings? PaymentSettings { get; set; }
 
         [StringLength(2000)]
         [DisplayName("Дополнительно к заказу")]

@@ -70,6 +70,8 @@ public class WebSocketHandler
         await using var context = _contextFactory.CreateDbContext();
         var orders = await context.Orders
             .Include(o => o.Users)
+            .Include(o => o.Address)
+            .Include(o => o.PaymentSettings)
             .Include(o => o.OrderItems)
             .ToListAsync();
 
@@ -89,6 +91,8 @@ public class WebSocketHandler
         await using var context = _contextFactory.CreateDbContext();
         var orders = await context.Orders
             .Include(o => o.Users)
+            .Include(o => o.Address)
+            .Include(o => o.PaymentSettings)
             .Include(o => o.OrderItems)
             .ToListAsync();
 
