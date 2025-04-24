@@ -8,17 +8,17 @@ namespace ArzanGo.Models
     {
         public Guid OrderId { get; set; }
         public string OrderNumber { get; set; } = GenerateOrderNumber();
-        public Guid UserId { get; set; } 
+        public Guid UserId { get; set; }
 
-        [JsonIgnore]
+        [JsonPropertyName("user")]
         public virtual User? Users { get; set; }
 
-        public Guid AddressId { get; set; } 
+        public Guid AddressId { get; set; }
 
-        [JsonIgnore]
+        [JsonPropertyName("address")]
         public virtual Address? Address { get; set; }
 
-        [JsonIgnore]
+        [JsonPropertyName("orderItems")]
         public virtual List<OrderItem>? OrderItems { get; set; } // Список товаров, заказанных в рамках этого заказа
         public decimal TotalAmount { get; set; } // Общая сумма заказа
         public DateTime OrderDate { get; set; } // Дата создания заказа
@@ -26,7 +26,7 @@ namespace ArzanGo.Models
         [DisplayName("Вид оплаты")]
         public Guid PaymentMethodId { get; set; } // ID метода оплаты
 
-        [JsonIgnore]
+        [JsonPropertyName("paymentMethod")]
         [DisplayName("Вид оплаты")]
         public virtual PaymentSettings? PaymentSettings { get; set; }
 

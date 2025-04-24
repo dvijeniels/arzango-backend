@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 public class WebSocketHandler
 {
@@ -73,9 +74,18 @@ public class WebSocketHandler
             .Include(o => o.Address)
             .Include(o => o.PaymentSettings)
             .Include(o => o.OrderItems)
+            .AsNoTracking() // Чтобы избежать проблем с отслеживанием сущностей
             .ToListAsync();
 
-        var ordersJson = JsonSerializer.Serialize(orders);
+        var options = new JsonSerializerOptions
+        {
+            ReferenceHandler = ReferenceHandler.Preserve, // Обработка циклических ссылок
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+
+        var ordersJson = JsonSerializer.Serialize(orders, options);
         var buffer = Encoding.UTF8.GetBytes(ordersJson);
 
         await webSocket.SendAsync(
@@ -95,8 +105,14 @@ public class WebSocketHandler
             .Include(o => o.PaymentSettings)
             .Include(o => o.OrderItems)
             .ToListAsync();
-
-        var ordersJson = JsonSerializer.Serialize(orders);
+        var options = new JsonSerializerOptions
+        {
+            ReferenceHandler = ReferenceHandler.Preserve, // Обработка циклических ссылок
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        var ordersJson = JsonSerializer.Serialize(orders, options);
         await BroadcastMessageAsync(ordersJson);
     }
 
