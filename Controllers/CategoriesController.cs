@@ -1,6 +1,7 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.DTO;
 using ArzanGo.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,6 +42,7 @@ namespace ArzanGo.Controllers
 
         // ✅ Создать новую категорию
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<Category>> CreateCategory([FromForm] CategoryDto dto)
         {
             var category = new Category
@@ -64,6 +66,7 @@ namespace ArzanGo.Controllers
 
         // ✅ Обновить категорию
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateCategory(
             Guid id,
             [FromForm] CategoryDto dto)
@@ -102,6 +105,7 @@ namespace ArzanGo.Controllers
 
         // ✅ Удалить категорию
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteCategory(Guid id)
         {
             var category = await _context.Categories.FindAsync(id);

@@ -133,7 +133,7 @@ namespace ArzanGo.Controllers
         {
             // 1. Находим пользователя по номеру телефона или email
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == model.Username || u.Password == model.Password);
+                .FirstOrDefaultAsync(u => u.Email == model.Username || u.PhoneNumber == model.Username);
 
             if (user == null)
             {
@@ -146,8 +146,8 @@ namespace ArzanGo.Controllers
                 return Unauthorized(new { Message = "Неверный пароль" });
             }
 
-            // 3. Генерируем JWT токен
-            var token = GenerateJwtToken(model.Username);
+            // 3. Генерируем JWT токен с ролями
+            var token = GenerateJwtToken(user);
 
             return Ok(new
             {
@@ -157,23 +157,36 @@ namespace ArzanGo.Controllers
                 LastName = user.LastName,
                 PhoneNumber = user.PhoneNumber,
                 Email = user.Email,
-                IsCourier = user.Courier
+                IsCourier = user.Courier,
+                IsAdmin = user.Admin
             });
         }
 
-        private string GenerateJwtToken(string username)
+        private string GenerateJwtToken(User user)
         {
-            // Проверяем, что ключ не null
             var jwtKey = _config["Jwt:Key"] ?? throw new ArgumentNullException("Jwt:Key не найден в конфигурации");
-
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
+            var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, username),
+                new Claim(JwtRegisteredClaimNames.Sub, user.Email ?? user.PhoneNumber),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim("userId", user.UserId.ToString()),
             };
+
+            // Добавляем роли в claims
+            if (user.Admin == true)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+            }
+            if (user.Courier == true)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "Courier"));
+            }
+            // По умолчанию все пользователи - User
+            claims.Add(new Claim(ClaimTypes.Role, "User"));
+
             var token = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],

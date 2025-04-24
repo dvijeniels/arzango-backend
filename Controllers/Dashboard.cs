@@ -1,5 +1,6 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.DTO;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +8,7 @@ namespace ArzanGo.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Roles = "Admin")]
     public class Dashboard : ControllerBase
     {
         private readonly AppDbContext _context;

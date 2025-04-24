@@ -1,4 +1,6 @@
 using ArzanGo.Data;
+using ArzanGo.Models;
+using ArzanGo.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -43,17 +45,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 // Добавляем политику, требующую аутентификацию по умолчанию
-//builder.Services.AddAuthorization(options =>
-//{
-//    options.FallbackPolicy = new AuthorizationPolicyBuilder()
-//        .RequireAuthenticatedUser()
-//        .Build();
-//});
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("CourierOnly", policy => policy.RequireRole("Courier"));
+    options.AddPolicy("AdminOrCourier", policy => policy.RequireRole("Admin", "Courier"));
+});
 
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddScoped<IPaymentService, PaymentService>();
+
+// В методе Configure или при инициализации приложения
+
 
 builder.Services.AddSingleton<WebSocketHandler>(provider =>
 {
@@ -62,6 +69,35 @@ builder.Services.AddSingleton<WebSocketHandler>(provider =>
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (!db.PaymentSettings.Any())
+    {
+        db.PaymentSettings.AddRange(
+            new PaymentSettings
+            {
+                Name = "Наличными",
+                IsActive = true,
+                DisplayOrder = 1
+            },
+            new PaymentSettings
+            {
+                Name = "Банковской картой",
+                IsActive = true,
+                DisplayOrder = 2
+            },
+            new PaymentSettings
+            {
+                Name = "Переводом",
+                IsActive = true,
+                DisplayOrder = 3
+            }
+        );
+        db.SaveChanges();
+    }
+}
 
 app.UseWebSockets();
 app.Use(async (context, next) =>
