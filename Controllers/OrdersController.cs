@@ -87,6 +87,13 @@ namespace ArzanGo.Controllers
                 Quantity = ci.Quantity
             }).ToList();
 
+            foreach (var item in order.OrderItems!)
+            {
+                if (item?.Product != null)
+                {
+                    item.Product.Stock -= item.Quantity;
+                }
+            }
             // 4. Очищаем корзину (но не удаляем CartItems для истории)
             cart.CartItems.Clear();
             cart.TotalAmount = 0;
@@ -119,7 +126,7 @@ namespace ArzanGo.Controllers
             {
                 if (item?.Product != null)
                 {
-                    item.Product.Stok += item.Quantity;
+                    item.Product.Stock += item.Quantity;
                 }
             }
 

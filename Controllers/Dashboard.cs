@@ -1,5 +1,6 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.DTO;
+using ArzanGo.Models.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -36,5 +37,89 @@ namespace ArzanGo.Controllers
                 Categories = result
             };
         }
+
+        [HttpGet("dashboard-data")]
+        public async Task<ActionResult<DashboardDataResponse>> GetDashboardData()
+        {
+            // Sales data (примерные данные - нужно адаптировать под вашу БД)
+            var salesData = new List<SalesData>
+            {
+                new SalesData { Month = "Янв", Sales = 4000 },
+                new SalesData { Month = "Фев", Sales = 3000 },
+                new SalesData { Month = "Мар", Sales = 5000 },
+                new SalesData { Month = "Апр", Sales = 7000 }
+            };
+
+            // Category data
+            var categoryData = await _context.Categories
+                .Include(c => c.Products)
+                .Select(c => new CategoryData
+                {
+                    Name = c.Name,
+                    Value = c.Products!.Count
+                })
+                .ToListAsync();
+
+            // Grand totals
+            var grandTotal = new List<GrandTotal>
+            {
+                new GrandTotal
+                {
+                    Icon = "TrendingUp",
+                    Label = "Жалпы сатылым",
+                    Value = _context.Orders.Sum(o=>o.TotalAmount).ToString()
+                },
+                new GrandTotal
+                {
+                    Icon = "Inventory",
+                    Label = "Жалпы продукция",
+                    Value = _context.Products.Count().ToString()
+                },
+                new GrandTotal
+                {
+                    Icon = "Category",
+                    Label = "Категориялардын саны",
+                    Value = _context.Categories.Count().ToString()
+                },
+                new GrandTotal
+                {
+                    Icon = "People",
+                    Label = "Колдонуучулардын саны",
+                    Value = _context.Users.Where(u=>u.Courier!=true && u.Admin!=true).Count().ToString("N0")
+                },
+                new GrandTotal
+                {
+                    Icon = "SupportAgent",
+                    Label = "Активдүү курьерлер",
+                    Value = _context.Users.Count(c => c.Courier==true).ToString()
+                },
+                new GrandTotal
+                {
+                    Icon = "ShoppingCart",
+                    Label = "Кайтаруу суранычтары",
+                    Value = _context.Orders.Count(o => o.Status == Models.Status.Canceled).ToString()
+                }
+            };
+
+            // Stock products (пример - нужно адаптировать под вашу модель)
+            var stockProducts = await _context.Products
+                .OrderBy(p => p.Stock)
+                .Take(3)
+                .Select(p => new StockProduct
+                {
+                    Name = p.Name,
+                    Stock = p.Stock
+                })
+                .ToListAsync();
+
+            return new DashboardDataResponse
+            {
+                SalesData = salesData,
+                CategoryData = categoryData,
+                GrandTotal = grandTotal,
+                StockProducts = stockProducts
+            };
+        }
     }
 }
+
