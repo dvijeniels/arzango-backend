@@ -13,6 +13,7 @@ namespace ArzanGo.Models
         public bool? Admin { get; set; } // Является ли Админом?
         public record Position(double Latitude, double Longitude);
         public required string Password { get; set; } // Хэш пароля
+        public double? Raiting { get; set; }
 
         [JsonIgnore]
         public virtual List<Order>? Orders { get; set; } // Список заказов пользователя
