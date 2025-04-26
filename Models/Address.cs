@@ -5,7 +5,7 @@ namespace ArzanGo.Models
 {
     public class Address
     {
-        public Guid AddressId { get; set; } // Уникальный идентификатор адреса
+        public Guid AddressId { get; set; } = Guid.NewGuid();
         public City City { get; set; } // Город (перечисление)
         public required string Street { get; set; } // Улица
         public required string House { get; set; } // Дом
