@@ -9,7 +9,6 @@ using System.Reflection;
 
 namespace ArzanGo.Controllers
 {
-    [Authorize]
     [Route("api/[controller]")]
     public class AddressesController : ControllerBase
     {
@@ -62,7 +61,7 @@ namespace ArzanGo.Controllers
 
         // ✅ Добавить новый адрес
         [HttpPost]
-        public async Task<ActionResult<Address>> AddAddress(Address address)
+        public async Task<ActionResult<Address>> AddAddress([FromBody] Address address)
         {
             address.AddressId = Guid.NewGuid();
             _context.Addresses.Add(address);
