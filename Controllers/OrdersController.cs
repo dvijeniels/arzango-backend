@@ -1,6 +1,7 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.Models;
 using ArzanGo.Models.Requests;
+using ArzanGo.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,11 +13,13 @@ namespace ArzanGo.Controllers
     {
         private readonly AppDbContext _context;
         private readonly WebSocketHandler _webSocketHandler;
+        private readonly IPaymentService _paymentService;
 
-        public OrdersController(AppDbContext context, WebSocketHandler webSocketHandler)
+        public OrdersController(AppDbContext context, WebSocketHandler webSocketHandler, IPaymentService paymentService)
         {
             _context = context;
             _webSocketHandler = webSocketHandler;
+            _paymentService = paymentService;
         }
 
         // ✅ Получить все заказы
