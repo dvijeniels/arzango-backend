@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace ArzanGo.Models
@@ -24,9 +25,10 @@ namespace ArzanGo.Models
         public DateTime OrderDate { get; set; } // Дата создания заказа
 
         [DisplayName("Вид оплаты")]
-        public Guid PaymentMethodId { get; set; } // ID метода оплаты
+        [ForeignKey("PaymentSettings")]
+        public Guid PaymentSettingId { get; set; } // ID метода оплаты
 
-        [JsonPropertyName("paymentMethod")]
+        [JsonPropertyName("paymentSettings")]
         [DisplayName("Вид оплаты")]
         public virtual PaymentSettings? PaymentSettings { get; set; }
 

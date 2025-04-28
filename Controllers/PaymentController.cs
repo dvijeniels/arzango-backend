@@ -50,7 +50,7 @@ namespace ArzanGo.Controllers
         [HttpPut("{id}")]
         public IActionResult UpdatePaymentMethod(Guid id, [FromBody] PaymentSettings settings)
         {
-            if (id != settings.PaymentMethodId)  // Проверка на соответствие ID
+            if (id != settings.PaymentSettingId)  // Проверка на соответствие ID
                 return BadRequest("ID in URL and body do not match.");
 
             try

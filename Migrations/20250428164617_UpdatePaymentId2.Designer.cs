@@ -4,6 +4,7 @@ using ArzanGo.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ArzanGo.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250428164617_UpdatePaymentId2")]
+    partial class UpdatePaymentId2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -269,6 +272,9 @@ namespace ArzanGo.Migrations
                     b.Property<Guid>("PaymentSettingId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("PaymentSettingsPaymentSettingId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -282,7 +288,7 @@ namespace ArzanGo.Migrations
 
                     b.HasIndex("AddressId");
 
-                    b.HasIndex("PaymentSettingId");
+                    b.HasIndex("PaymentSettingsPaymentSettingId");
 
                     b.HasIndex("UserId");
 
@@ -526,9 +532,7 @@ namespace ArzanGo.Migrations
 
                     b.HasOne("ArzanGo.Models.PaymentSettings", "PaymentSettings")
                         .WithMany("Orders")
-                        .HasForeignKey("PaymentSettingId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("PaymentSettingsPaymentSettingId");
 
                     b.HasOne("ArzanGo.Models.User", "Users")
                         .WithMany("Orders")

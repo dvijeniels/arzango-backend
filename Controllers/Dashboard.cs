@@ -4,6 +4,7 @@ using ArzanGo.Models.Requests;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 
 namespace ArzanGo.Controllers
 {
@@ -41,14 +42,45 @@ namespace ArzanGo.Controllers
         [HttpGet("dashboard-data")]
         public async Task<ActionResult<DashboardDataResponse>> GetDashboardData()
         {
-            // Sales data (примерные данные - нужно адаптировать под вашу БД)
-            var salesData = new List<SalesData>
+            // Получаем текущую дату и вычисляем дату 4 месяца назад
+            var endDate = DateTime.Now;
+            var startDate = endDate.AddMonths(-3); // Чтобы получить 4 месяца (включая текущий)
+
+            // Получаем данные о продажах за последние 4 месяца
+            var salesData = await _context.Orders
+                .Where(o => o.OrderDate >= startDate && o.OrderDate <= endDate)
+                .GroupBy(o => new { o.OrderDate.Month, o.OrderDate.Year })
+                .Select(g => new
+                {
+                    Month = g.Key.Month,
+                    Year = g.Key.Year,
+                    TotalSales = g.Sum(o => o.TotalAmount)
+                })
+                .OrderBy(x => x.Year)
+                .ThenBy(x => x.Month)
+                .ToListAsync();
+
+            // Форматируем данные для ответа
+            var formattedSalesData = salesData.Select(s => new SalesData
             {
-                new SalesData { Month = "Янв", Sales = 4000 },
-                new SalesData { Month = "Фев", Sales = 3000 },
-                new SalesData { Month = "Мар", Sales = 5000 },
-                new SalesData { Month = "Апр", Sales = 7000 }
-            };
+                Month = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(s.Month),
+                Sales = s.TotalSales
+            }).ToList();
+
+            // Если данных меньше чем 4 месяца, добавляем недостающие месяцы с нулевыми продажами
+            for (int i = 0; i < 4; i++)
+            {
+                var date = startDate.AddMonths(i);
+                var monthName = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(date.Month);
+
+                if (!formattedSalesData.Any(s => s.Month == monthName))
+                {
+                    formattedSalesData.Insert(i, new SalesData { Month = monthName, Sales = 0 });
+                }
+            }
+
+            // Оставляем только последние 4 месяца
+            formattedSalesData = formattedSalesData.TakeLast(4).ToList();
 
             // Category data
             var categoryData = await _context.Categories
@@ -114,7 +146,7 @@ namespace ArzanGo.Controllers
 
             return new DashboardDataResponse
             {
-                SalesData = salesData,
+                SalesData = formattedSalesData,
                 CategoryData = categoryData,
                 GrandTotal = grandTotal,
                 StockProducts = stockProducts

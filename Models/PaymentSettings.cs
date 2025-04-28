@@ -7,7 +7,7 @@ namespace ArzanGo.Models
     public class PaymentSettings
     {
         [Key]
-        public Guid PaymentMethodId { get; set; }
+        public Guid PaymentSettingId { get; set; }
 
         [DisplayName("Название метода оплаты")]
         public required string Name { get; set; }

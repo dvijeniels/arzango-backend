@@ -27,7 +27,7 @@ namespace ArzanGo.Controllers
         public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
         {
             return await _context.Orders.Include(o => o.Users).Include(o => o.Address).Include(o => o.PaymentSettings)
-                                        .Include(o => o.OrderItems)
+                                        .Include(o => o.OrderItems!).ThenInclude(o=>o.Product)
                                         .ToListAsync();
         }
 
@@ -36,7 +36,7 @@ namespace ArzanGo.Controllers
         public async Task<ActionResult<Order>> GetOrder(Guid id)
         {
             var order = await _context.Orders.Include(o => o.Users).Include(o => o.Address).Include(o => o.PaymentSettings)
-                                             .Include(o => o.OrderItems)
+                                             .Include(o => o.OrderItems!).ThenInclude(o => o.Product)
                                              .FirstOrDefaultAsync(o => o.OrderId == id);
 
             if (order == null)
@@ -52,7 +52,7 @@ namespace ArzanGo.Controllers
                 .Include(o => o.Users)
                 .Include(o => o.PaymentSettings)
                 .Include(o => o.Address)
-                .Include(o => o.OrderItems)
+                .Include(o => o.OrderItems!).ThenInclude(o => o.Product)
                 .Where(o => o.UserId == userId)
                 .ToListAsync();
 
@@ -76,7 +76,7 @@ namespace ArzanGo.Controllers
                 UserId = userId,
                 OrderDate = DateTime.UtcNow,
                 Status = Status.InProcessing,
-                PaymentMethodId = request.PaymentMethodId,
+                PaymentSettingId = request.PaymentSettingId,
                 Comment = request.Comment,
                 AddressId = request.AddressId,
                 TotalAmount = cart.TotalAmount
