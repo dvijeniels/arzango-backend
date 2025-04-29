@@ -61,11 +61,13 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 // ¬ методе Configure или при инициализации приложени€
 
+builder.Services.AddSingleton<FirebaseNotificationService>();
 
 builder.Services.AddSingleton<WebSocketHandler>(provider =>
 {
     var contextFactory = provider.GetRequiredService<IDbContextFactory<AppDbContext>>();
-    return new WebSocketHandler(contextFactory);
+    var logger = provider.GetRequiredService<ILogger<WebSocketHandler>>();
+    return new WebSocketHandler(contextFactory, logger);
 });
 
 var app = builder.Build();

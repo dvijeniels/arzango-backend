@@ -1,20 +1,23 @@
-﻿using ArzanGo.Data;
-using Microsoft.EntityFrameworkCore;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ArzanGo.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 public class WebSocketHandler
 {
     private static readonly ConcurrentDictionary<string, WebSocket> _clients = new();
-    private static readonly ConcurrentDictionary<Guid, string> _userConnections = new(); // Для связи userId → WebSocket
+    private readonly ILogger<WebSocketHandler> _logger;
+    private static readonly ConcurrentDictionary<Guid, string> _userConnections = new();
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
 
-    public WebSocketHandler(IDbContextFactory<AppDbContext> contextFactory)
+    public WebSocketHandler(IDbContextFactory<AppDbContext> contextFactory, ILogger<WebSocketHandler> logger)
     {
         _contextFactory = contextFactory;
+        _logger = logger;
     }
 
     public async Task HandleWebSocketAsync(WebSocket webSocket, Guid? userId = null)
@@ -24,7 +27,7 @@ public class WebSocketHandler
 
         if (userId.HasValue)
         {
-            _userConnections.TryAdd(userId.Value, clientId); // Связываем userId с WebSocket
+            _userConnections.TryAdd(userId.Value, clientId);
         }
 
         try
@@ -65,7 +68,6 @@ public class WebSocketHandler
         }
     }
 
-    // Отправка списка заказов (как было)
     private async Task SendAllOrdersAsync(WebSocket webSocket)
     {
         await using var context = _contextFactory.CreateDbContext();
@@ -74,12 +76,12 @@ public class WebSocketHandler
             .Include(o => o.Address)
             .Include(o => o.PaymentSettings)
             .Include(o => o.OrderItems)
-            .AsNoTracking() // Чтобы избежать проблем с отслеживанием сущностей
+            .AsNoTracking()
             .ToListAsync();
 
         var options = new JsonSerializerOptions
         {
-            ReferenceHandler = ReferenceHandler.Preserve, // Обработка циклических ссылок
+            ReferenceHandler = ReferenceHandler.Preserve,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -95,29 +97,91 @@ public class WebSocketHandler
             CancellationToken.None);
     }
 
-    // Рассылка обновлений заказов (как было)
-    public async Task BroadcastOrdersUpdateAsync()
+    private async Task SendSingleOrderAsync(WebSocket webSocket, Guid orderId)
     {
-        await using var context = _contextFactory.CreateDbContext();
-        var orders = await context.Orders
-            .Include(o => o.Users)
-            .Include(o => o.Address)
-            .Include(o => o.PaymentSettings)
-            .Include(o => o.OrderItems)
-            .ToListAsync();
-        var options = new JsonSerializerOptions
+        try
         {
-            ReferenceHandler = ReferenceHandler.Preserve, // Обработка циклических ссылок
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
-        var ordersJson = JsonSerializer.Serialize(orders, options);
-        await BroadcastMessageAsync(ordersJson);
+            await using var context = _contextFactory.CreateDbContext();
+
+            var order = await context.Orders
+                .Include(o => o.Users)
+                .Include(o => o.Address)
+                .Include(o => o.PaymentSettings)
+                .Include(o => o.OrderItems)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+            if (order == null)
+            {
+                _logger.LogWarning("Order {OrderId} not found", orderId);
+                await SendErrorMessageAsync(webSocket, "Order not found");
+                return;
+            }
+
+            var options = new JsonSerializerOptions
+            {
+                ReferenceHandler = ReferenceHandler.Preserve,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            var orderJson = JsonSerializer.Serialize(new { type = "order_update", data = order }, options);
+            await SendJsonMessageAsync(webSocket, orderJson);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending order {OrderId} to client", orderId);
+            await SendErrorMessageAsync(webSocket, "Internal server error");
+        }
     }
 
-    // Отправка сообщения всем клиентам
-    private static async Task BroadcastMessageAsync(string message)
+    private async Task SendJsonMessageAsync(WebSocket webSocket, string json)
+    {
+        var buffer = Encoding.UTF8.GetBytes(json);
+        await webSocket.SendAsync(
+            new ArraySegment<byte>(buffer),
+            WebSocketMessageType.Text,
+            true,
+            CancellationToken.None);
+    }
+
+    private async Task SendErrorMessageAsync(WebSocket webSocket, string error)
+    {
+        var errorMessage = JsonSerializer.Serialize(new { type = "error", message = error });
+        await SendJsonMessageAsync(webSocket, errorMessage);
+    }
+
+    public async Task SendOrderUpdateAsync(Guid orderId)
+    {
+        var disconnectedClientIds = new List<string>();
+
+        foreach (var client in _clients)
+        {
+            try
+            {
+                if (client.Value.State == WebSocketState.Open)
+                {
+                    await SendSingleOrderAsync(client.Value, orderId);
+                }
+                else
+                {
+                    disconnectedClientIds.Add(client.Key);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending order update to client {ClientId}", client.Key);
+                disconnectedClientIds.Add(client.Key);
+            }
+        }
+
+        foreach (var clientId in disconnectedClientIds)
+        {
+            _clients.TryRemove(clientId, out _);
+            _logger.LogInformation("Client {ClientId} disconnected and removed", clientId);
+        }
+    }
+
+    private async Task BroadcastMessageAsync(string message)
     {
         var bytes = Encoding.UTF8.GetBytes(message);
         var buffer = new ArraySegment<byte>(bytes);
@@ -131,7 +195,6 @@ public class WebSocketHandler
         }
     }
 
-    // 🔥 Новый метод: Отправка уведомления конкретному пользователю
     public async Task SendNotificationToUserAsync(Guid userId, string message)
     {
         if (_userConnections.TryGetValue(userId, out var clientId) &&

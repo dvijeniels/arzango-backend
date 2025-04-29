@@ -60,25 +60,37 @@ namespace ArzanGo.Controllers
             return CreatedAtAction(nameof(GetUser), new { id = user.UserId }, user);
         }
 
-        // ✅ Обновить пользователя
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateUser(Guid id, User user)
+        // ✅ Обновить пользователя
+        public async Task<IActionResult> UpdateUser(Guid id, UserUpdateModel model)
         {
-            if (id != user.UserId)
-                return BadRequest();
+            if (id != model.UserId)
+                return BadRequest("ID in URL and body do not match");
 
-            _context.Entry(user).State = EntityState.Modified;
+            var existingUser = await _context.Users.FindAsync(id);
+            if (existingUser == null)
+                return NotFound("User not found");
 
             try
             {
+                // Обновляем только изменяемые поля
+                existingUser.FirstName = model.FirstName;
+                existingUser.LastName = model.LastName;
+                existingUser.Email = model.Email;
+                existingUser.PhoneNumber = model.PhoneNumber;
+                existingUser.Admin = model.Admin;
+                existingUser.Courier = model.Courier;
+                existingUser.FcmToken = model.FcmToken;
+                existingUser.Password = model.Password;
+
+                _context.Users.Update(existingUser);
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
                 if (!_context.Users.Any(e => e.UserId == id))
                     return NotFound();
-                else
-                    throw;
+                throw;
             }
 
             return NoContent();
@@ -118,6 +130,7 @@ namespace ArzanGo.Controllers
                 LastName = model.LastName,
                 Email = model.Email,
                 PhoneNumber = model.PhoneNumber,
+                FcmToken = model.FmcToken,
                 Password = model.Password, // В реальном проекте нужно хэшировать пароль!
             };
 

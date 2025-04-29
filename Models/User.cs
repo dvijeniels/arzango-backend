@@ -24,5 +24,7 @@ namespace ArzanGo.Models
 
         [JsonIgnore]
         public List<Address>? ShippingAddresses { get; set; }
+
+        public string? FcmToken { get; set; }
     }
 }

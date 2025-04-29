@@ -14,12 +14,14 @@ namespace ArzanGo.Controllers
         private readonly AppDbContext _context;
         private readonly WebSocketHandler _webSocketHandler;
         private readonly IPaymentService _paymentService;
+        //private readonly FirebaseNotificationService _firebaseService;
 
-        public OrdersController(AppDbContext context, WebSocketHandler webSocketHandler, IPaymentService paymentService)
+        public OrdersController(AppDbContext context, WebSocketHandler webSocketHandler, IPaymentService paymentService) //FirebaseNotificationService firebaseService)
         {
             _context = context;
             _webSocketHandler = webSocketHandler;
             _paymentService = paymentService;
+            //_firebaseService = firebaseService;
         }
 
         // ✅ Получить все заказы
@@ -105,10 +107,25 @@ namespace ArzanGo.Controllers
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
+            //var user = await _context.Users.FindAsync(userId);
+
+            //if (!string.IsNullOrEmpty(user?.FcmToken))
+            //{
+            //    await _firebaseService.SendNotificationToUserAsync(
+            //        user.FcmToken,
+            //        "Новый заказ создан",
+            //        $"Ваш заказ #{order.OrderNumber} успешно создан",
+            //        new Dictionary<string, string>
+            //        {
+            //        { "orderId", order.OrderId.ToString() },
+            //        { "type", "order_created" }
+            //        });
+            //}
+
             await _webSocketHandler.SendNotificationToUserAsync(userId,
                 $"Ваш заказ #{order.OrderNumber} создан! Статус: {order.Status}");
 
-            await _webSocketHandler.BroadcastOrdersUpdateAsync();
+            await _webSocketHandler.SendOrderUpdateAsync(order.OrderId);
             return Ok(order);
         }
 
@@ -137,7 +154,7 @@ namespace ArzanGo.Controllers
             await _context.SaveChangesAsync();
             await _webSocketHandler.SendNotificationToUserAsync(order.UserId,
                 $"Заказ #{order.OrderNumber} отменён.");
-            await _webSocketHandler.BroadcastOrdersUpdateAsync();
+            await _webSocketHandler.SendOrderUpdateAsync(order.OrderId);
             return Ok();
         }
 
@@ -154,7 +171,7 @@ namespace ArzanGo.Controllers
             await _webSocketHandler.SendNotificationToUserAsync(order.UserId,
                 $"Заказ #{order.OrderNumber} удалён администратором.");
 
-            await _webSocketHandler.BroadcastOrdersUpdateAsync();
+            await _webSocketHandler.SendOrderUpdateAsync(order.OrderId);
             return NoContent();
         }
     }
