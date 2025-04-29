@@ -15,7 +15,7 @@ public class FirebaseNotificationService
         {
             FirebaseApp.Create(new AppOptions()
             {
-                Credential = GoogleCredential.FromFile("firebase-service-account.json")
+                Credential = GoogleCredential.FromFile("arzango-f1e63-firebase-adminsdk-fbsvc-023440f58e.json")
                     .CreateScoped("https://www.googleapis.com/auth/firebase.messaging")
             });
         }

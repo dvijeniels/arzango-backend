@@ -14,14 +14,14 @@ namespace ArzanGo.Controllers
         private readonly AppDbContext _context;
         private readonly WebSocketHandler _webSocketHandler;
         private readonly IPaymentService _paymentService;
-        //private readonly FirebaseNotificationService _firebaseService;
+        private readonly FirebaseNotificationService _firebaseService;
 
-        public OrdersController(AppDbContext context, WebSocketHandler webSocketHandler, IPaymentService paymentService) //FirebaseNotificationService firebaseService)
+        public OrdersController(AppDbContext context, WebSocketHandler webSocketHandler, IPaymentService paymentService, FirebaseNotificationService firebaseService)
         {
             _context = context;
             _webSocketHandler = webSocketHandler;
             _paymentService = paymentService;
-            //_firebaseService = firebaseService;
+            _firebaseService = firebaseService;
         }
 
         // ✅ Получить все заказы
@@ -107,26 +107,72 @@ namespace ArzanGo.Controllers
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            //var user = await _context.Users.FindAsync(userId);
+            var user = await _context.Users.FindAsync(userId);
 
-            //if (!string.IsNullOrEmpty(user?.FcmToken))
-            //{
-            //    await _firebaseService.SendNotificationToUserAsync(
-            //        user.FcmToken,
-            //        "Новый заказ создан",
-            //        $"Ваш заказ #{order.OrderNumber} успешно создан",
-            //        new Dictionary<string, string>
-            //        {
-            //        { "orderId", order.OrderId.ToString() },
-            //        { "type", "order_created" }
-            //        });
-            //}
+            if (!string.IsNullOrEmpty(user?.FcmToken))
+            {
+                await _firebaseService.SendNotificationToUserAsync(
+                    user.FcmToken,
+                    "Новый заказ создан",
+                    $"Ваш заказ #{order.OrderNumber} успешно создан",
+                    new Dictionary<string, string>
+                    {
+                    { "orderId", order.OrderId.ToString() },
+                    { "type", "order_created" }
+                    });
+            }
 
             await _webSocketHandler.SendNotificationToUserAsync(userId,
                 $"Ваш заказ #{order.OrderNumber} создан! Статус: {order.Status}");
 
             await _webSocketHandler.SendOrderUpdateAsync(order.OrderId);
             return Ok(order);
+        }
+
+        [HttpPatch("{orderId}/update-status")]
+        public async Task<IActionResult> UpdateOrderStatus(Guid orderId, [FromBody] UpdateOrderStatusRequest request)
+        {
+            // 1. Получаем заказ с необходимыми включениями
+            var order = await _context.Orders
+                .Include(o => o.Users)
+                .Include(o => o.OrderItems!)
+                    .ThenInclude(oi => oi.Product)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+            if (order == null)
+                return NotFound("Order not found");
+
+            // 3. Сохраняем предыдущий статус для логов/уведомлений
+            var previousStatus = order.Status;
+            order.Status = request.NewStatus;
+
+            // 5. Сохраняем изменения
+            await _context.SaveChangesAsync();
+
+            // 6. Отправляем уведомления
+            await _webSocketHandler.SendNotificationToUserAsync(order.UserId,
+                $"Статус заказа #{order.OrderNumber} был изменён {order.Status}.");
+
+            if (!string.IsNullOrEmpty(order.Users?.FcmToken))
+            {
+                await _firebaseService.SendNotificationToUserAsync(
+                    order.Users.FcmToken,
+                    $"Статус заказа обновлен",
+                    $"Заказ #{order.OrderNumber}: {order.Status}",
+                    new Dictionary<string, string>
+                    {
+                { "orderId", order.OrderId.ToString() },
+                { "type", "order_status_update" },
+                { "newStatus", order.Status.ToString() }
+                    });
+            }
+
+            return Ok(order);
+        }
+
+        public class UpdateOrderStatusRequest
+        {
+            public Status NewStatus { get; set; }
         }
 
         [HttpPost("{orderId}/cancel")]

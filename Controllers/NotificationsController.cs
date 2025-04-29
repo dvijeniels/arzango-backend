@@ -45,6 +45,13 @@ namespace ArzanGo.Controllers
         {
             try
             {
+                // Проверяем наличие токена
+                if (string.IsNullOrEmpty(request.DeviceToken))
+                {
+                    _logger.LogWarning("Attempt to send notification without device token");
+                    return BadRequest(new { Error = "Device token is required" });
+                }
+
                 await _firebaseService.SendNotificationToUserAsync(
                     request.DeviceToken,
                     request.Title,
@@ -82,7 +89,7 @@ namespace ArzanGo.Controllers
 
         public class SendToUserRequest
         {
-            public required string DeviceToken { get; set; }
+            public string? DeviceToken { get; set; }
             public required string Title { get; set; }
             public required string Body { get; set; }
             public Dictionary<string, string>? Data { get; set; }
