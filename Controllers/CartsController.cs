@@ -107,6 +107,7 @@ namespace ArzanGo.Controllers
                 if (existingItem != null)
                 {
                     existingItem.Quantity += request.Quantity;
+                    existingItem.Price = product.FinalPrice;
                 }
                 else
                 {
