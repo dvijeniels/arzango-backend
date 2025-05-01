@@ -96,13 +96,13 @@ public class WebSocketHandler
             true,
             CancellationToken.None);
     }
-
     private async Task SendSingleOrderAsync(WebSocket webSocket, Guid orderId)
     {
         try
         {
             await using var context = _contextFactory.CreateDbContext();
 
+            // Получаем заказ и связанные данные
             var order = await context.Orders
                 .Include(o => o.Users)
                 .Include(o => o.Address)
@@ -118,13 +118,42 @@ public class WebSocketHandler
                 return;
             }
 
+            // Получаем всех курьеров (Users с Courier == true)
+            var couriers = await context.Users
+                .Where(u => u.Courier == true)
+                .AsNoTracking()
+                .ToListAsync();
+
             var options = new JsonSerializerOptions
             {
                 ReferenceHandler = ReferenceHandler.Preserve,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                // Исключаем циклические ссылки и ненужные данные
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
 
-            var orderJson = JsonSerializer.Serialize(new { type = "order_update", data = order }, options);
+            // Создаем объект для отправки, включающий заказ и список курьеров
+            var responseData = new
+            {
+                type = "order_update",
+                data = new
+                {
+                    order = order,
+                    couriers = couriers.Select(c => new
+                    {
+                        c.UserId,
+                        c.FirstName,
+                        c.LastName,
+                        c.PhoneNumber,
+                        c.Email,
+                        c.Raiting,
+                        c.FcmToken
+                        // Исключаем чувствительные данные как Password и другие ненужные поля
+                    })
+                }
+            };
+
+            var orderJson = JsonSerializer.Serialize(responseData, options);
             await SendJsonMessageAsync(webSocket, orderJson);
         }
         catch (Exception ex)

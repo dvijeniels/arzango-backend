@@ -4,6 +4,7 @@ using ArzanGo.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ArzanGo.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250501140106_NewUpdate")]
+    partial class NewUpdate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -255,15 +258,9 @@ namespace ArzanGo.Migrations
                     b.Property<Guid>("AddressId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime?>("AssignedDate")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("Comment")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
-
-                    b.Property<Guid?>("CourierId")
-                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("OrderDate")
                         .HasColumnType("datetime2");
@@ -287,8 +284,6 @@ namespace ArzanGo.Migrations
                     b.HasKey("OrderId");
 
                     b.HasIndex("AddressId");
-
-                    b.HasIndex("CourierId");
 
                     b.HasIndex("PaymentSettingId");
 
@@ -535,11 +530,6 @@ namespace ArzanGo.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ArzanGo.Models.User", "Courier")
-                        .WithMany()
-                        .HasForeignKey("CourierId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("ArzanGo.Models.PaymentSettings", "PaymentSettings")
                         .WithMany("Orders")
                         .HasForeignKey("PaymentSettingId")
@@ -549,12 +539,10 @@ namespace ArzanGo.Migrations
                     b.HasOne("ArzanGo.Models.User", "Users")
                         .WithMany("Orders")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Address");
-
-                    b.Navigation("Courier");
 
                     b.Navigation("PaymentSettings");
 

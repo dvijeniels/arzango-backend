@@ -30,6 +30,20 @@ namespace ArzanGo.Data
                 .WithMany(a => a.Orders)
                 .HasForeignKey(o => o.AddressId)
                 .OnDelete(DeleteBehavior.Restrict); // Изменяем поведение удаления
+
+            // Configure the relationship between Order and User (Customer)
+            modelBuilder.Entity<Order>()
+                .HasOne(o => o.Users)
+                .WithMany(u => u.Orders)
+                .HasForeignKey(o => o.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Configure the relationship between Order and User (Courier)
+            modelBuilder.Entity<Order>()
+                .HasOne(o => o.Courier)
+                .WithMany() // Assuming Courier doesn't have a navigation property back to Orders
+                .HasForeignKey(o => o.CourierId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

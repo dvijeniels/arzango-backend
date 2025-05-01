@@ -19,7 +19,9 @@ namespace ArzanGo.Models
         public virtual List<Order>? Orders { get; set; } // Список заказов пользователя
 
         [JsonIgnore]
-        public virtual List<Cart>? Carts { get; set; } 
+        public virtual List<Cart>? Carts { get; set; }
+
+        [JsonIgnore]
         public virtual ICollection<Favorite>? Favorites { get; set; } = new HashSet<Favorite>();
 
         [JsonIgnore]

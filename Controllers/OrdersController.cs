@@ -2,6 +2,7 @@
 using ArzanGo.Models;
 using ArzanGo.Models.Requests;
 using ArzanGo.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,6 +23,98 @@ namespace ArzanGo.Controllers
             _webSocketHandler = webSocketHandler;
             _paymentService = paymentService;
             _firebaseService = firebaseService;
+        }
+
+        // ✅ Курьер берет заказ
+        [HttpPost("{orderId}/assign-courier/{courierId}")]
+        [Authorize(Roles = "Courier,Admin")] // Только курьеры и админы могут вызывать этот метод
+        public async Task<IActionResult> AssignCourierToOrder(Guid orderId, Guid courierId)
+        {
+            // 1. Проверяем существование заказа
+            var order = await _context.Orders
+                .Include(o => o.Users)
+                .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+            if (order == null)
+                return NotFound("Order not found");
+
+            // 2. Проверяем, что заказ в правильном статусе
+            if (order.Status != Status.InProcessing && order.Status != Status.InProcessing)
+                return BadRequest("Order cannot be assigned in current status");
+
+            // 3. Проверяем, что курьер существует и действительно является курьером
+            var courier = await _context.Users.FindAsync(courierId);
+            if (courier == null || courier.Courier != true)
+                return BadRequest("Invalid courier");
+
+            // 4. Проверяем, что курьер не имеет других активных заказов
+            var hasActiveOrders = await _context.Orders
+                .AnyAsync(o => o.CourierId == courierId &&
+                              (o.Status == Status.IsReceivedByCourier || o.Status == Status.InProcessing || o.Status == Status.IsOnTheWay));
+
+            if (hasActiveOrders)
+                return BadRequest("Courier already has active orders");
+
+            // 5. Обновляем заказ
+            order.CourierId = courierId;
+            order.Status = Status.IsReceivedByCourier;
+            order.AssignedDate = DateTime.Now;
+
+            // 6. Сохраняем изменения
+            await _context.SaveChangesAsync();
+
+            // 7. Отправляем уведомления
+            // Пользователю
+            if (!string.IsNullOrEmpty(order.Users?.FcmToken))
+            {
+                await _firebaseService.SendNotificationToUserAsync(
+                    order.Users.FcmToken,
+                    "Курьер назначен",
+                    $"Курьер {courier.FirstName} {courier.LastName} принял ваш заказ #{order.OrderNumber}",
+                    new Dictionary<string, string>
+                    {
+                { "orderId", order.OrderId.ToString() },
+                { "type", "courier_assigned" },
+                { "courierName", $"{courier.FirstName} {courier.LastName}" }
+                    });
+            }
+
+            // Курьеру
+            if (!string.IsNullOrEmpty(courier.FcmToken))
+            {
+                await _firebaseService.SendNotificationToUserAsync(
+                    courier.FcmToken,
+                    "Новый заказ",
+                    $"Вы приняли заказ #{order.OrderNumber}",
+                    new Dictionary<string, string>
+                    {
+                { "orderId", order.OrderId.ToString() },
+                { "type", "order_assigned" }
+                    });
+            }
+
+            await _webSocketHandler.SendNotificationToUserAsync(order.UserId,
+                $"Курьер {courier.FirstName} {courier.LastName} принял ваш заказ #{order.OrderNumber}");
+
+            await _webSocketHandler.SendNotificationToUserAsync(courierId,
+                $"Вы приняли заказ #{order.OrderNumber}");
+
+            await _webSocketHandler.SendOrderUpdateAsync(order.OrderId);
+
+            return Ok(new
+            {
+                OrderId = order.OrderId,
+                Status = order.Status,
+                Courier = new
+                {
+                    courier.UserId,
+                    courier.FirstName,
+                    courier.LastName,
+                    courier.PhoneNumber,
+                    courier.Email,
+                    courier.Raiting
+                }
+            });
         }
 
         // ✅ Получить все заказы
@@ -76,7 +169,7 @@ namespace ArzanGo.Controllers
             var order = new Order
             {
                 UserId = userId,
-                OrderDate = DateTime.UtcNow,
+                OrderDate = DateTime.Now,
                 Status = Status.InProcessing,
                 PaymentSettingId = request.PaymentSettingId,
                 Comment = request.Comment,
@@ -144,7 +237,9 @@ namespace ArzanGo.Controllers
 
             // 3. Сохраняем предыдущий статус для логов/уведомлений
             var previousStatus = order.Status;
+            var previousComment = order.Comment;
             order.Status = request.NewStatus;
+            order.Comment = request.Comment;
 
             // 5. Сохраняем изменения
             await _context.SaveChangesAsync();
@@ -173,10 +268,11 @@ namespace ArzanGo.Controllers
         public class UpdateOrderStatusRequest
         {
             public Status NewStatus { get; set; }
+            public string? Comment { get; set; }
         }
 
         [HttpPost("{orderId}/cancel")]
-        public async Task<IActionResult> CancelOrder(Guid orderId)
+        public async Task<IActionResult> CancelOrder(Guid orderId,string? comment)
         {
             var order = await _context.Orders
                 .Include(o => o.OrderItems!)
@@ -197,6 +293,7 @@ namespace ArzanGo.Controllers
             }
 
             order.Status = Status.Canceled;
+            order.Comment = comment;
             await _context.SaveChangesAsync();
             await _webSocketHandler.SendNotificationToUserAsync(order.UserId,
                 $"Заказ #{order.OrderNumber} отменён.");

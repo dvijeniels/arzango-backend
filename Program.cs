@@ -130,6 +130,7 @@ app.UseCors(builder =>
            .AllowAnyMethod()
            .AllowAnyHeader()
 );
+app.UseMiddleware<CustomAuthorizationMiddleware>();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

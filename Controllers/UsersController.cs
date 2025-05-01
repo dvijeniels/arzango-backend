@@ -34,6 +34,15 @@ namespace ArzanGo.Controllers
                                        .ToListAsync();
         }
 
+        // ✅ Получить всех курьеров
+        [HttpGet("couriers")]
+        public async Task<ActionResult<IEnumerable<User>>> GetCouriers()
+        {
+            return await _context.Users
+                .Where(u => u.Courier == true) // Фильтруем только курьеров
+                .ToListAsync();
+        }
+
         // ✅ Получить одного пользователя по ID
         [HttpGet("{id}")]
         public async Task<ActionResult<User>> GetUser(Guid id)

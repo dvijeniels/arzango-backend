@@ -12,7 +12,15 @@ namespace ArzanGo.Models
         public Guid UserId { get; set; }
 
         [JsonPropertyName("user")]
+        [ForeignKey("UserId")]
         public virtual User? Users { get; set; }
+
+        public Guid? CourierId { get; set; } // ID курьера, который взял заказ
+        public DateTime? AssignedDate { get; set; } // Дата назначения курьера
+
+        [ForeignKey("CourierId")]
+        [JsonIgnore]
+        public virtual User? Courier { get; set; }
 
         public Guid AddressId { get; set; }
 

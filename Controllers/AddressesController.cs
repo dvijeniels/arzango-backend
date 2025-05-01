@@ -61,23 +61,44 @@ namespace ArzanGo.Controllers
 
         // ✅ Добавить новый адрес
         [HttpPost]
-        public async Task<ActionResult<Address>> AddAddress([FromBody] Address address)
+        public async Task<ActionResult<Address>> AddAddress([FromBody] AddressDto model)
         {
-            address.AddressId = Guid.NewGuid();
+            model.AddressId = Guid.NewGuid();
+
+            var address = new Address
+            {
+                AddressId = Guid.NewGuid(),
+                City = model.CityEnum,
+                Street = model.Street,
+                House = model.House,
+                Additionally = model.Additionally,
+                PostalCode = model.PostalCode,
+                UserId = model.UserId
+            };
+
             _context.Addresses.Add(address);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetAddress), new { id = address.AddressId }, address);
+            return CreatedAtAction(nameof(GetAddress), new { id = model.AddressId }, model);
         }
 
         // ✅ Обновить адрес
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateAddress(Guid id, Address address)
+        public async Task<IActionResult> UpdateAddress(Guid id, AddressDto address)
         {
-            if (id != address.AddressId)
-                return BadRequest();
+            var existingAddress = await _context.Addresses.FindAsync(id);
+            if (existingAddress == null)
+            {
+                return NotFound();
+            }
 
-            _context.Entry(address).State = EntityState.Modified;
+            // Обновляем только разрешенные поля
+            existingAddress.City = address.CityEnum;
+            existingAddress.Street = address.Street;
+            existingAddress.House = address.House;
+            existingAddress.Additionally = address.Additionally;
+            existingAddress.PostalCode = address.PostalCode;
+            existingAddress.UserId = address.UserId;
 
             try
             {

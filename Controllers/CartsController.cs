@@ -64,7 +64,6 @@ namespace ArzanGo.Controllers
         [HttpPost("user/{userId}/items")]
         public async Task<ActionResult<Cart>> AddToCart(Guid userId, [FromBody] AddToCartRequest request)
         {
-            // 1. Валидация запроса
             if (request == null)
                 return BadRequest("Request cannot be null");
 
@@ -73,7 +72,7 @@ namespace ArzanGo.Controllers
 
             try
             {
-                // 2. Получаем или создаем корзину
+                // Получаем или создаем корзину
                 var cart = await _context.Carts
                     .Include(c => c.CartItems)
                     .FirstOrDefaultAsync(c => c.UserId == userId);
@@ -88,26 +87,20 @@ namespace ArzanGo.Controllers
                         TotalAmount = 0
                     };
                     _context.Carts.Add(cart);
-                    await _context.SaveChangesAsync();
-                }
-                else
-                {
-                    // Инициализируем CartItems если null
-                    cart.CartItems ??= new List<CartItem>();
                 }
 
-                // 3. Проверяем товар
+                // Проверяем товар
                 var product = await _context.Products.FindAsync(request.ProductId);
                 if (product == null)
                     return NotFound("Product not found");
 
-                // 5. Ищем товар в корзине
-                var existingItem = cart.CartItems.FirstOrDefault(ci => ci.ProductId == request.ProductId);
+                // Ищем товар в корзине
+                var existingItem = cart.CartItems!.FirstOrDefault(ci => ci.ProductId == request.ProductId);
 
                 if (existingItem != null)
                 {
                     existingItem.Quantity += request.Quantity;
-                    existingItem.Price = product.FinalPrice;
+                    existingItem.Price = product.FinalPrice; // Храним цену за единицу
                 }
                 else
                 {
@@ -117,20 +110,20 @@ namespace ArzanGo.Controllers
                         CartId = cart.CartId,
                         ProductId = product.ProductId,
                         Quantity = request.Quantity,
-                        Price = product.FinalPrice
+                        Price = product.FinalPrice // Храним цену за единицу
                     };
-                    _context.CartItems.Add(newItem);
-                    cart.CartItems.Add(newItem);
+                    cart.CartItems!.Add(newItem);
                 }
 
-                // 6. Пересчитываем сумму (с защитой от null)
-                cart.TotalAmount = cart.CartItems.Sum(ci => ci.Price * ci.Quantity);
+                // Пересчитываем общую стоимость корзины
+                cart.TotalAmount = cart.CartItems!.Sum(ci => ci.TotalPrice); // Используем вычисляемое свойство
 
                 await _context.SaveChangesAsync();
                 return Ok(cart);
             }
             catch (Exception)
             {
+                // Логирование ошибки
                 return StatusCode(500, "An error occurred while processing your request");
             }
         }
