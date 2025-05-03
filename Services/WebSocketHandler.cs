@@ -72,7 +72,7 @@ public class WebSocketHandler
     {
         await using var context = _contextFactory.CreateDbContext();
         var orders = await context.Orders
-            .Include(o => o.Users)
+            .Include(o => o.User)
             .Include(o => o.Address)
             .Include(o => o.PaymentSettings)
             .Include(o => o.OrderItems)
@@ -104,7 +104,7 @@ public class WebSocketHandler
 
             // Получаем заказ и связанные данные
             var order = await context.Orders
-                .Include(o => o.Users)
+                .Include(o => o.User)
                 .Include(o => o.Address)
                 .Include(o => o.PaymentSettings)
                 .Include(o => o.OrderItems)

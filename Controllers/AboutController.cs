@@ -7,14 +7,9 @@ namespace ArzanGo.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AboutController : ControllerBase
+    public class AboutController(AppDbContext context) : ControllerBase
     {
-        private readonly AppDbContext _context;
-
-        public AboutController(AppDbContext context)
-        {
-            _context = context;
-        }
+        private readonly AppDbContext _context = context;
 
         // ✅ Получить информацию "О нас"
         [HttpGet]

@@ -9,8 +9,10 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 
+// Регистрируем сам DbContext (Scoped)
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -69,6 +71,9 @@ builder.Services.AddSingleton<WebSocketHandler>(provider =>
     var logger = provider.GetRequiredService<ILogger<WebSocketHandler>>();
     return new WebSocketHandler(contextFactory, logger);
 });
+
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 var app = builder.Build();
 

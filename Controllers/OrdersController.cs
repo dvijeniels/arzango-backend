@@ -32,7 +32,7 @@ namespace ArzanGo.Controllers
         {
             // 1. Проверяем существование заказа
             var order = await _context.Orders
-                .Include(o => o.Users)
+                .Include(o => o.User)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
             if (order == null)
@@ -65,10 +65,10 @@ namespace ArzanGo.Controllers
 
             // 7. Отправляем уведомления
             // Пользователю
-            if (!string.IsNullOrEmpty(order.Users?.FcmToken))
+            if (!string.IsNullOrEmpty(order.User?.FcmToken))
             {
                 await _firebaseService.SendNotificationToUserAsync(
-                    order.Users.FcmToken,
+                    order.User.FcmToken,
                     "Курьер назначен",
                     $"Курьер {courier.FirstName} {courier.LastName} принял ваш заказ #{order.OrderNumber}",
                     new Dictionary<string, string>
@@ -121,8 +121,8 @@ namespace ArzanGo.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
         {
-            return await _context.Orders.Include(o => o.Users).Include(o => o.Address).Include(o => o.PaymentSettings)
-                                        .Include(o => o.OrderItems!).ThenInclude(o=>o.Product)
+            return await _context.Orders.Include(o => o.User).Include(o => o.Address).Include(o => o.PaymentSettings).Include(o => o.Courier)
+                                        .Include(o => o.OrderItems!).ThenInclude(o => o.Product)
                                         .ToListAsync();
         }
 
@@ -130,7 +130,7 @@ namespace ArzanGo.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Order>> GetOrder(Guid id)
         {
-            var order = await _context.Orders.Include(o => o.Users).Include(o => o.Address).Include(o => o.PaymentSettings)
+            var order = await _context.Orders.Include(o => o.User).Include(o => o.Address).Include(o => o.PaymentSettings).Include(o => o.Courier)
                                              .Include(o => o.OrderItems!).ThenInclude(o => o.Product)
                                              .FirstOrDefaultAsync(o => o.OrderId == id);
 
@@ -144,8 +144,9 @@ namespace ArzanGo.Controllers
         public async Task<ActionResult<IEnumerable<Order>>> GetOrdersByUser(Guid userId)
         {
             var orders = await _context.Orders
-                .Include(o => o.Users)
+                .Include(o => o.User)
                 .Include(o => o.PaymentSettings)
+                .Include(o => o.Courier)
                 .Include(o => o.Address)
                 .Include(o => o.OrderItems!).ThenInclude(o => o.Product)
                 .Where(o => o.UserId == userId)
@@ -165,61 +166,68 @@ namespace ArzanGo.Controllers
             if (cart == null || cart.CartItems == null || !cart.CartItems.Any())
                 return BadRequest("Cart is empty");
 
-            // 2. Создаем заказ
-            var order = new Order
+            try
             {
-                UserId = userId,
-                OrderDate = DateTime.Now,
-                Status = Status.InProcessing,
-                PaymentSettingId = request.PaymentSettingId,
-                Comment = request.Comment,
-                AddressId = request.AddressId,
-                TotalAmount = cart.TotalAmount
-            };
-
-            // 3. Переносим товары из корзины в заказ
-            order.OrderItems = cart.CartItems.Select(ci => new OrderItem
-            {
-                ProductId = ci.ProductId,
-                Price = ci.Price,
-                Quantity = ci.Quantity
-            }).ToList();
-
-            foreach (var item in order.OrderItems!)
-            {
-                if (item?.Product != null)
+                // 2. Создаем заказ
+                var order = new Order
                 {
-                    item.Product.Stock -= item.Quantity;
-                }
-            }
-            // 4. Очищаем корзину (но не удаляем CartItems для истории)
-            cart.CartItems.Clear();
-            cart.TotalAmount = 0;
+                    UserId = userId,
+                    OrderDate = DateTime.Now,
+                    Status = Status.InProcessing,
+                    PaymentSettingId = request.PaymentSettingId,
+                    Comment = request.Comment,
+                    AddressId = request.AddressId,
+                    TotalAmount = cart.TotalAmount
+                };
 
-            // 5. Сохраняем изменения
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
+                // 3. Переносим товары из корзины в заказ
+                order.OrderItems = cart.CartItems.Select(ci => new OrderItem
+                {
+                    ProductId = ci.ProductId,
+                    Price = ci.Price,
+                    Quantity = ci.Quantity
+                }).ToList();
 
-            var user = await _context.Users.FindAsync(userId);
-
-            if (!string.IsNullOrEmpty(user?.FcmToken))
-            {
-                await _firebaseService.SendNotificationToUserAsync(
-                    user.FcmToken,
-                    "Новый заказ создан",
-                    $"Ваш заказ #{order.OrderNumber} успешно создан",
-                    new Dictionary<string, string>
+                foreach (var item in order.OrderItems!)
+                {
+                    if (item?.Product != null)
                     {
+                        item.Product.Stock -= item.Quantity;
+                    }
+                }
+                // 4. Очищаем корзину (но не удаляем CartItems для истории)
+                cart.CartItems.Clear();
+                cart.TotalAmount = 0;
+
+                // 5. Сохраняем изменения
+                _context.Orders.Add(order);
+                await _context.SaveChangesAsync();
+
+                var user = await _context.Users.FindAsync(userId);
+
+                if (!string.IsNullOrEmpty(user?.FcmToken))
+                {
+                    await _firebaseService.SendNotificationToUserAsync(
+                        user.FcmToken,
+                        "Новый заказ создан",
+                        $"Ваш заказ #{order.OrderNumber} успешно создан",
+                        new Dictionary<string, string>
+                        {
                     { "orderId", order.OrderId.ToString() },
                     { "type", "order_created" }
-                    });
+                        });
+                }
+
+                await _webSocketHandler.SendNotificationToUserAsync(userId,
+                    $"Ваш заказ #{order.OrderNumber} создан! Статус: {order.Status}");
+
+                await _webSocketHandler.SendOrderUpdateAsync(order.OrderId);
+                return Ok(order);
             }
-
-            await _webSocketHandler.SendNotificationToUserAsync(userId,
-                $"Ваш заказ #{order.OrderNumber} создан! Статус: {order.Status}");
-
-            await _webSocketHandler.SendOrderUpdateAsync(order.OrderId);
-            return Ok(order);
+            catch (Exception ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
         }
 
         [HttpPatch("{orderId}/update-status")]
@@ -227,7 +235,7 @@ namespace ArzanGo.Controllers
         {
             // 1. Получаем заказ с необходимыми включениями
             var order = await _context.Orders
-                .Include(o => o.Users)
+                .Include(o => o.User)
                 .Include(o => o.OrderItems!)
                     .ThenInclude(oi => oi.Product)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId);
@@ -248,10 +256,10 @@ namespace ArzanGo.Controllers
             await _webSocketHandler.SendNotificationToUserAsync(order.UserId,
                 $"Статус заказа #{order.OrderNumber} был изменён {order.Status}.");
 
-            if (!string.IsNullOrEmpty(order.Users?.FcmToken))
+            if (!string.IsNullOrEmpty(order.User?.FcmToken))
             {
                 await _firebaseService.SendNotificationToUserAsync(
-                    order.Users.FcmToken,
+                    order.User.FcmToken,
                     $"Статус заказа обновлен",
                     $"Заказ #{order.OrderNumber}: {order.Status}",
                     new Dictionary<string, string>
@@ -272,11 +280,11 @@ namespace ArzanGo.Controllers
         }
 
         [HttpPost("{orderId}/cancel")]
-        public async Task<IActionResult> CancelOrder(Guid orderId,string? comment)
+        public async Task<IActionResult> CancelOrder(Guid orderId, string? comment)
         {
             var order = await _context.Orders
                 .Include(o => o.OrderItems!)
-                .ThenInclude(ci => ci.Product).Include(o => o.PaymentSettings).Include(o => o.Users).Include(o => o.Address)
+                .ThenInclude(ci => ci.Product).Include(o => o.PaymentSettings).Include(o => o.User).Include(o => o.Address)
                 .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
             if (order == null) return NotFound();

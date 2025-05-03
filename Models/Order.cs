@@ -9,17 +9,18 @@ namespace ArzanGo.Models
     {
         public Guid OrderId { get; set; }
         public string OrderNumber { get; set; } = GenerateOrderNumber();
+
+        [ForeignKey("User")]
         public Guid UserId { get; set; }
 
         [JsonPropertyName("user")]
-        [ForeignKey("UserId")]
-        public virtual User? Users { get; set; }
+        public virtual User? User { get; set; }
 
+        [ForeignKey("Courier")]
         public Guid? CourierId { get; set; } // ID курьера, который взял заказ
         public DateTime? AssignedDate { get; set; } // Дата назначения курьера
 
-        [ForeignKey("CourierId")]
-        [JsonIgnore]
+        [JsonPropertyName("courier")]
         public virtual User? Courier { get; set; }
 
         public Guid AddressId { get; set; }

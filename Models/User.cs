@@ -16,7 +16,10 @@ namespace ArzanGo.Models
         public double? Raiting { get; set; }
 
         [JsonIgnore]
-        public virtual List<Order>? Orders { get; set; } // Список заказов пользователя
+        public virtual List<Order> Orders { get; set; } = new(); // Заказы как клиент
+
+        [JsonIgnore]
+        public virtual List<Order> CourierOrders { get; set; } = new(); // Заказы как курьер
 
         [JsonIgnore]
         public virtual List<Cart>? Carts { get; set; }

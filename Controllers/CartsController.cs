@@ -93,7 +93,6 @@ namespace ArzanGo.Controllers
                 var product = await _context.Products.FindAsync(request.ProductId);
                 if (product == null)
                     return NotFound("Product not found");
-
                 // Ищем товар в корзине
                 var existingItem = cart.CartItems!.FirstOrDefault(ci => ci.ProductId == request.ProductId);
 
@@ -112,7 +111,7 @@ namespace ArzanGo.Controllers
                         Quantity = request.Quantity,
                         Price = product.FinalPrice // Храним цену за единицу
                     };
-                    cart.CartItems!.Add(newItem);
+                    _context.CartItems!.Add(newItem);
                 }
 
                 // Пересчитываем общую стоимость корзины

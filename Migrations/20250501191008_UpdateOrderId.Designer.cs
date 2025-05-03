@@ -4,6 +4,7 @@ using ArzanGo.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ArzanGo.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250501191008_UpdateOrderId")]
+    partial class UpdateOrderId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -284,6 +287,9 @@ namespace ArzanGo.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("UserId1")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("OrderId");
 
                     b.HasIndex("AddressId");
@@ -293,6 +299,8 @@ namespace ArzanGo.Migrations
                     b.HasIndex("PaymentSettingId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("UserId1");
 
                     b.ToTable("Orders");
                 });
@@ -536,7 +544,7 @@ namespace ArzanGo.Migrations
                         .IsRequired();
 
                     b.HasOne("ArzanGo.Models.User", "Courier")
-                        .WithMany("CourierOrders")
+                        .WithMany()
                         .HasForeignKey("CourierId")
                         .OnDelete(DeleteBehavior.Restrict);
 
@@ -546,11 +554,15 @@ namespace ArzanGo.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("ArzanGo.Models.User", "User")
+                    b.HasOne("ArzanGo.Models.User", "Users")
                         .WithMany("Orders")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("ArzanGo.Models.User", null)
+                        .WithMany("CourierOrders")
+                        .HasForeignKey("UserId1");
 
                     b.Navigation("Address");
 
@@ -558,7 +570,7 @@ namespace ArzanGo.Migrations
 
                     b.Navigation("PaymentSettings");
 
-                    b.Navigation("User");
+                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("ArzanGo.Models.OrderItem", b =>

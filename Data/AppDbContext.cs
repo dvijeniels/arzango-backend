@@ -31,17 +31,16 @@ namespace ArzanGo.Data
                 .HasForeignKey(o => o.AddressId)
                 .OnDelete(DeleteBehavior.Restrict); // Изменяем поведение удаления
 
-            // Configure the relationship between Order and User (Customer)
             modelBuilder.Entity<Order>()
-                .HasOne(o => o.Users)
+                .HasOne(o => o.User)
                 .WithMany(u => u.Orders)
                 .HasForeignKey(o => o.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Configure the relationship between Order and User (Courier)
+            // Настройка отношения Order -> User (курьер)
             modelBuilder.Entity<Order>()
                 .HasOne(o => o.Courier)
-                .WithMany() // Assuming Courier doesn't have a navigation property back to Orders
+                .WithMany(u => u.CourierOrders)
                 .HasForeignKey(o => o.CourierId)
                 .OnDelete(DeleteBehavior.Restrict);
         }

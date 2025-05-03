@@ -9,14 +9,9 @@ namespace ArzanGo.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ProductsController : ControllerBase
+    public class ProductsController(AppDbContext context) : ControllerBase
     {
-        private readonly AppDbContext _context;
-
-        public ProductsController(AppDbContext context)
-        {
-            _context = context;
-        }
+        private readonly AppDbContext _context = context;
 
         // GET: api/products
         [HttpGet]
@@ -77,7 +72,7 @@ namespace ArzanGo.Controllers
                 // Обрабатываем загруженные файлы
                 if (productDto.Photos != null && productDto.Photos.Count > 0)
                 {
-                    product.ProductPhotos = new List<ProductPhoto>();
+                    product.ProductPhotos = [];
 
                     // Путь к папке для загрузки
                     var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "products");
@@ -263,7 +258,7 @@ namespace ArzanGo.Controllers
             // Process new photos
             if (photos.Count > 0)
             {
-                product.ProductPhotos ??= new List<ProductPhoto>();
+                product.ProductPhotos ??= [];
                 var uploadPath = Path.Combine("wwwroot", "images", "products");
 
                 // Ensure directory exists
