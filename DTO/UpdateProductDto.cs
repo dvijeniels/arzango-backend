@@ -2,8 +2,9 @@
 
 namespace ArzanGo.DTO
 {
-    public class ProductDto
+    public class UpdateProductDto
     {
+        public Guid ProductId { get; set; }
         public required string Name { get; set; }
 
         public string? Description { get; set; }

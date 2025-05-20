@@ -103,6 +103,7 @@ namespace ArzanGo.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+                return Ok(existingAddress);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -111,8 +112,6 @@ namespace ArzanGo.Controllers
                 else
                     throw;
             }
-
-            return NoContent();
         }
 
         // ✅ Удалить адрес

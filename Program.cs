@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-
+builder.Services.AddHttpClient();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -60,9 +60,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddScoped<IPaymentService, PaymentService>();
-
+builder.Services.AddSingleton<IKyrgyzstanTimeService, KyrgyzstanTimeService>();
 // ¬ методе Configure или при инициализации приложени€
-
+builder.Services.Configure<FirebaseSettings>(builder.Configuration.GetSection("Firebase"));
 builder.Services.AddSingleton<FirebaseNotificationService>();
 
 builder.Services.AddSingleton<WebSocketHandler>(provider =>

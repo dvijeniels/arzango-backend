@@ -75,7 +75,9 @@ public class WebSocketHandler
             .Include(o => o.User)
             .Include(o => o.Address)
             .Include(o => o.PaymentSettings)
-            .Include(o => o.OrderItems)
+            .Include(o => o.OrderItems!)
+            .ThenInclude(o=>o.Product)
+            .ThenInclude(o => o!.ProductPhotos)
             .AsNoTracking()
             .ToListAsync();
 
@@ -107,7 +109,9 @@ public class WebSocketHandler
                 .Include(o => o.User)
                 .Include(o => o.Address)
                 .Include(o => o.PaymentSettings)
-                .Include(o => o.OrderItems)
+                .Include(o => o.OrderItems!)
+                .ThenInclude(o => o.Product)
+                .ThenInclude(o => o!.ProductPhotos)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(o => o.OrderId == orderId);
 

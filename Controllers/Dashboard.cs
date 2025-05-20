@@ -1,6 +1,7 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.DTO;
 using ArzanGo.Models.Requests;
+using ArzanGo.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,16 +16,18 @@ namespace ArzanGo.Controllers
     public class Dashboard : ControllerBase
     {
         private readonly AppDbContext _context;
-        public Dashboard(AppDbContext context)
+        private readonly IKyrgyzstanTimeService _timeService;
+        public Dashboard(AppDbContext context,IKyrgyzstanTimeService timeService)
         {
             _context = context;
+            _timeService = timeService;
         }
 
         [HttpGet("dashboard-data")]
         public async Task<ActionResult<DashboardDataResponse>> GetDashboardData()
         {
             // Получаем текущую дату и вычисляем дату 4 месяца назад
-            var endDate = DateTime.Now;
+            var endDate = _timeService.Now;
             var startDate = endDate.AddMonths(-3); // Чтобы получить 4 месяца (включая текущий)
 
             // Получаем данные о продажах за последние 4 месяца
@@ -80,7 +83,7 @@ namespace ArzanGo.Controllers
                 {
                     Icon = "TrendingUp",
                     Label = "Жалпы сатылым",
-                    Value = _context.Orders.Sum(o=>o.TotalAmount).ToString()
+                    Value = _context.Orders.Where(o=>o.Status==Models.Status.IsDelivered).Sum(o=>o.TotalAmount).ToString()
                 },
                 new GrandTotal
                 {

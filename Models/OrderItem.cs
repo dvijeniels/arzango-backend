@@ -11,7 +11,7 @@ namespace ArzanGo.Models
         public virtual Order? Order { get; set; } // Навигационное свойство для заказа
         public Guid ProductId { get; set; } // Идентификатор товара
 
-        [JsonIgnore]
+        [JsonPropertyName("product")]
         public virtual Product? Product { get; set; } // Навигационное свойство для товара
         public int Quantity { get; set; } // Количество товара в заказе
         public decimal Price { get; set; } // Цена товара на момент заказа

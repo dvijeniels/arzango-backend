@@ -13,7 +13,7 @@ namespace ArzanGo.Models
         public Guid ProductId { get; set; } // Товар, который добавлен в избранное
         public virtual Product? Product { get; set; }
 
-        public DateTime DateAdded { get; set; } = DateTime.Now; // Дата добавления в избранное
+        public DateTime DateAdded { get; set; }
     }
 
 }

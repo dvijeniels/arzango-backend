@@ -1,5 +1,6 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.Models;
+using ArzanGo.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,14 +8,15 @@ namespace ArzanGo.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ReportController(AppDbContext context) : ControllerBase
+    public class ReportController(AppDbContext context, IKyrgyzstanTimeService timeService) : ControllerBase
     {
         private readonly AppDbContext _context = context;
+        private readonly IKyrgyzstanTimeService _timeService = timeService;
 
         [HttpGet("generate")]
         public async Task<IActionResult> GenerateReport(
-    [FromQuery] Guid categoryId,
-    [FromQuery] Guid paymentMethodId,
+    [FromQuery] Guid? categoryId = null,
+    [FromQuery] Guid? paymentMethodId = null, 
     [FromQuery] string period = "weekly",
     [FromQuery] DateTime? startDate = null,
     [FromQuery] DateTime? endDate = null,
@@ -44,7 +46,7 @@ namespace ArzanGo.Controllers
                 {
                     success = true,
                     message = "Rapor başarıyla oluşturuldu",
-                    timestamp = DateTime.Now.ToString("o"),
+                    timestamp = _timeService.Now.ToString("o"),
                     data = reportData,
                     pagination = new
                     {
@@ -61,7 +63,7 @@ namespace ArzanGo.Controllers
                 {
                     success = false,
                     message = $"Rapor oluşturulurken hata oluştu: {ex.Message}",
-                    timestamp = DateTime.Now.ToString("o")
+                    timestamp = _timeService.Now.ToString("o")
                 });
             }
         }
@@ -69,8 +71,8 @@ namespace ArzanGo.Controllers
     string period,
     DateTime startDate,
     DateTime endDate,
-    Guid categoryId,
-    Guid paymentMethodId,
+    Guid? categoryId,  // Теперь nullable
+    Guid? paymentMethodId,  // Теперь nullable
     int pageNumber,
     int pageSize)
         {
@@ -79,14 +81,14 @@ namespace ArzanGo.Controllers
                 .Where(o => o.OrderDate >= startDate && o.OrderDate <= endDate)
                 .AsQueryable();
 
-            // Check for default Guid instead of string.IsNullOrEmpty
-            if (categoryId != Guid.Empty)
+            // Фильтр по категории (если передан)
+            if (categoryId.HasValue && categoryId != Guid.Empty)
             {
                 query = query.Where(o => o.OrderItems!.Any(oi => oi.Product!.CategoryId == categoryId));
             }
 
-            // Check for default Guid instead of string.IsNullOrEmpty
-            if (paymentMethodId != Guid.Empty)
+            // Фильтр по методу оплаты (если передан)
+            if (paymentMethodId.HasValue && paymentMethodId != Guid.Empty)
             {
                 query = query.Where(o => o.PaymentSettingId == paymentMethodId);
             }
@@ -98,7 +100,7 @@ namespace ArzanGo.Controllers
                 .Include(o => o.PaymentSettings)
                 .ToListAsync();
 
-            // Генерация отчета
+            // Генерация отчета (остальной код без изменений)
             var reportData = new ReportData
             {
                 Filters = new ReportFilters
@@ -106,14 +108,14 @@ namespace ArzanGo.Controllers
                     Period = period,
                     StartDate = startDate.ToString("yyyy-MM-dd"),
                     EndDate = endDate.ToString("yyyy-MM-dd"),
-                    CategoryId = categoryId,
-                    PaymentMethodId = paymentMethodId
+                    CategoryId = categoryId ?? Guid.Empty,
+                    PaymentMethodId = paymentMethodId ?? Guid.Empty
                 },
                 GeneralSummary = await GenerateGeneralSummary(orders),
                 SalesTrends = GenerateSalesTrends(orders, startDate, endDate, period),
                 ProductAnalyses = await GenerateProductAnalyses(orders, pageNumber, pageSize),
                 CategoryAnalyses = await GenerateCategoryAnalyses(orders, pageNumber, pageSize),
-                PaymentMethods = await GeneratePaymentMethods(orders) // Made async to match the new version
+                PaymentMethods = await GeneratePaymentMethods(orders)
             };
 
             return reportData;
@@ -123,11 +125,14 @@ namespace ArzanGo.Controllers
         {
             return await Task.Run(() =>
             {
-                var totalRevenue = orders.Sum(o => o.TotalAmount);
-                var totalOrders = orders.Count;
+                var deliveredOrders = orders.Where(o => o.Status == Status.IsDelivered).ToList();
+
+                var totalRevenue = deliveredOrders.Sum(o => o.TotalAmount);
+                var totalOrders = deliveredOrders.Count;
                 var averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-                var topProduct = orders
+                // Топ продаваемый товар
+                var topProductGroup = deliveredOrders
                     .SelectMany(o => o.OrderItems!)
                     .GroupBy(oi => new { oi.ProductId, oi.Product!.Name })
                     .Select(g => new
@@ -139,58 +144,69 @@ namespace ArzanGo.Controllers
                     .OrderByDescending(x => x.SalesCount)
                     .FirstOrDefault();
 
-                var topCategory = orders
+                var topSellingProduct = topProductGroup != null ? new TopSellingProduct
+                {
+                    ProductId = topProductGroup.ProductId,
+                    ProductName = topProductGroup.ProductName,
+                    SalesCount = topProductGroup.SalesCount
+                } : null;
+
+                // Самая популярная категория
+                var topCategoryGroup = deliveredOrders
                     .SelectMany(o => o.OrderItems!)
-                    .GroupBy(oi => new { oi.Product!.CategoryId, oi.Product!.Category!.Name })
+                    .GroupBy(oi => new { oi.Product!.CategoryId, oi.Product.Category!.Name })
                     .Select(g => new
                     {
                         g.Key.CategoryId,
                         CategoryName = g.Key.Name,
                         Revenue = g.Sum(oi => oi.Quantity * oi.Price),
-                        RevenueRatio = (decimal)g.Sum(oi => oi.Quantity * oi.Price) / totalRevenue
+                        RevenueRatio = totalRevenue > 0 ?
+                            (double)g.Sum(oi => oi.Quantity * oi.Price) / (double)totalRevenue :
+                            0
                     })
                     .OrderByDescending(x => x.Revenue)
                     .FirstOrDefault();
 
-                var topPaymentMethod = orders
+                var mostPopularCategory = topCategoryGroup != null ? new MostPopularCategory
+                {
+                    CategoryId = topCategoryGroup.CategoryId,
+                    CategoryName = topCategoryGroup.CategoryName,
+                    RevenueRatio = topCategoryGroup.RevenueRatio
+                } : null;
+
+                // Самый используемый метод оплаты
+                var topPaymentGroup = deliveredOrders
                     .GroupBy(o => new { o.PaymentSettingId, o.PaymentSettings!.Name })
                     .Select(g => new
                     {
                         PaymentMethodId = g.Key.PaymentSettingId,
                         PaymentMethodName = g.Key.Name,
                         UsageCount = g.Count(),
-                        UsageRatio = (decimal)g.Count() / totalOrders
+                        UsageRatio = totalOrders > 0 ?
+                            (double)g.Count() / totalOrders :
+                            0
                     })
                     .OrderByDescending(x => x.UsageCount)
                     .FirstOrDefault();
+
+                var mostUsedPayment = topPaymentGroup != null ? new MostUsedPayment
+                {
+                    PaymentMethodId = topPaymentGroup.PaymentMethodId,
+                    PaymentMethodName = topPaymentGroup.PaymentMethodName,
+                    UsageRatio = topPaymentGroup.UsageRatio
+                } : null;
 
                 return new GeneralSummary
                 {
                     TotalRevenue = totalRevenue,
                     TotalOrders = totalOrders,
                     AverageOrderValue = averageOrderValue,
-                    TopSellingProduct = topProduct != null ? new TopSellingProduct
-                    {
-                        ProductId = topProduct.ProductId,
-                        ProductName = topProduct.ProductName,
-                        SalesCount = topProduct.SalesCount
-                    } : null,
-                    MostPopularCategory = topCategory != null ? new MostPopularCategory
-                    {
-                        CategoryId = topCategory.CategoryId,
-                        CategoryName = topCategory.CategoryName,
-                        RevenueRatio = (double)topCategory.RevenueRatio
-                    } : null,
-                    MostUsedPayment = topPaymentMethod != null ? new MostUsedPayment
-                    {
-                        PaymentMethodId = topPaymentMethod.PaymentMethodId,
-                        PaymentMethodName = topPaymentMethod.PaymentMethodName,
-                        UsageRatio = (double)topPaymentMethod.UsageRatio
-                    } : null
+                    TopSellingProduct = topSellingProduct,
+                    MostPopularCategory = mostPopularCategory,
+                    MostUsedPayment = mostUsedPayment
                 };
             });
         }
-
 
         private static List<SalesTrend> GenerateSalesTrends(List<Order> orders, DateTime startDate, DateTime endDate, string period)
         {
@@ -200,11 +216,15 @@ namespace ArzanGo.Controllers
             while (currentDate <= endDate)
             {
                 var dailyOrders = orders
+                    .Where(o => o.Status == Status.IsDelivered)
                     .Where(o => o.OrderDate.Date == currentDate.Date)
                     .ToList();
 
+                // Находим самый продаваемый товар (может быть null)
                 var topProduct = dailyOrders
+                    .Where(o => o.Status == Status.IsDelivered)
                     .SelectMany(o => o.OrderItems!)
+                    .Where(oi => oi.Product != null) // Защита от null в Product
                     .GroupBy(oi => oi.Product!.Name)
                     .Select(g => new
                     {
@@ -219,7 +239,7 @@ namespace ArzanGo.Controllers
                     Date = currentDate.ToString("yyyy-MM-dd"),
                     Revenue = dailyOrders.Sum(o => o.TotalAmount),
                     OrderCount = dailyOrders.Count,
-                    TopSellingProduct = topProduct!.ProductName
+                    TopSellingProduct = topProduct?.ProductName ?? "Нет данных" // Если topProduct == null, подставляем заглушку
                 });
 
                 currentDate = period.ToLower() switch
@@ -238,6 +258,7 @@ namespace ArzanGo.Controllers
         {
             // First get all product analyses without the PreviousPeriodComparison
             var productAnalyses = orders
+                .Where(o => o.Status == Status.IsDelivered)
                 .SelectMany(o => o.OrderItems!)
                 .GroupBy(oi => new {
                     oi.ProductId,
@@ -250,7 +271,7 @@ namespace ArzanGo.Controllers
                     ProductName = g.Key.ProductName!,
                     CategoryName = g.Key.CategoryName!,
                     SalesCount = g.Sum(oi => oi.Quantity),
-                    TotalRevenue = g.Sum(oi => oi.Quantity * oi.Price),
+                    TotalRevenue = g.Where(a => a.Order!.Status == Models.Status.IsDelivered).Sum(oi => oi.Quantity * oi.Price),
                     AveragePrice = g.Average(oi => oi.Price),
                     StockStatus = 0, // Temporary value, will be updated later
                     PreviousPeriodComparison = 0 // Temporary value
@@ -291,6 +312,7 @@ namespace ArzanGo.Controllers
 
             // Get previous period sales
             var previousSales = await _context.OrderItems
+                .Where(oi => oi.Order!.Status == Status.IsDelivered)
                 .Where(oi => oi.ProductId == productId)
                 .Where(oi => oi.Order!.OrderDate >= previousStartDate && oi.Order.OrderDate < previousEndDate)
                 .SumAsync(oi => oi.Quantity * oi.Price);
@@ -316,6 +338,7 @@ namespace ArzanGo.Controllers
 
             // Process in batches if you have large datasets
             var groupedItems = orders
+                .Where(o => o.Status == Status.IsDelivered)
                 .Where(o => o.OrderItems != null)
                 .SelectMany(o => o.OrderItems!)
                 .Where(oi => oi.Product != null && oi.Product.Category != null)

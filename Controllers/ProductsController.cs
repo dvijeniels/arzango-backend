@@ -1,7 +1,7 @@
 ﻿using ArzanGo.Data;
 using ArzanGo.DTO;
 using ArzanGo.Models;
-using Microsoft.AspNetCore.Authorization;
+using ArzanGo.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,15 +9,16 @@ namespace ArzanGo.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ProductsController(AppDbContext context) : ControllerBase
+    public class ProductsController(AppDbContext context, IKyrgyzstanTimeService timeService) : ControllerBase
     {
         private readonly AppDbContext _context = context;
+        private readonly IKyrgyzstanTimeService _timeService = timeService;
 
         // GET: api/products
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            return await _context.Products.Include(p => p.Category).Include(p=>p.ProductPhotos).ToListAsync();
+            return await _context.Products.Include(p => p.Category).Include(p => p.ProductPhotos).ToListAsync();
         }
 
         [HttpGet("GetProductsForHomePage")]
@@ -63,8 +64,10 @@ namespace ArzanGo.Controllers
                     PurchasePrice = productDto.PurchasePrice,
                     RetailPrice = productDto.RetailPrice,
                     DiscountPrice = productDto.DiscountPrice,
+                    Stock = productDto.Stock,
+                    ShowOnHomePage = productDto.ShowOnHomePage,
                     CategoryId = productDto.CategoryId,
-                    ProductDate = DateTime.Now
+                    ProductDate = _timeService.Now
                 };
 
                 _context.Products.Add(product);
@@ -142,18 +145,97 @@ namespace ArzanGo.Controllers
 
         // PUT: api/products/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutProduct(Guid id, Product product)
+        public async Task<IActionResult> PutProduct(Guid id, [FromForm] UpdateProductDto productDto)
         {
-            if (id != product.ProductId)
+            // Проверка соответствия ID в пути и DTO
+            if (id != productDto.ProductId)
             {
-                return BadRequest();
+                return BadRequest("ID in URL does not match ProductId in request");
             }
 
-            _context.Entry(product).State = EntityState.Modified;
+            // Находим существующий продукт с фотографиями
+            var existingProduct = await _context.Products
+                .Include(p => p.ProductPhotos)
+                .FirstOrDefaultAsync(p => p.ProductId == id);
+
+            if (existingProduct == null)
+            {
+                return NotFound();
+            }
+
+            // Обновляем основные свойства
+            existingProduct.Name = productDto.Name;
+            existingProduct.Description = productDto.Description;
+            existingProduct.PurchasePrice = productDto.PurchasePrice;
+            existingProduct.RetailPrice = productDto.RetailPrice;
+            existingProduct.DiscountPrice = productDto.DiscountPrice;
+            existingProduct.Stock = productDto.Stock;
+            existingProduct.ShowOnHomePage = productDto.ShowOnHomePage;
+            existingProduct.CategoryId = productDto.CategoryId;
+
+            // Обработка фотографий
+            if (productDto.Photos != null && productDto.Photos.Count > 0)
+            {
+                var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "images", "products");
+
+                // Создаем папку, если не существует
+                if (!Directory.Exists(uploadPath))
+                {
+                    Directory.CreateDirectory(uploadPath);
+                }
+
+                // Удаляем старые фотографии (опционально)
+                _context.ProductPhotos.RemoveRange(existingProduct.ProductPhotos!);
+
+                // Добавляем новые фотографии
+                foreach (var photo in productDto.Photos)
+                {
+                    try
+                    {
+                        // Валидация файла
+                        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
+                        var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
+
+                        if (string.IsNullOrEmpty(extension) || !allowedExtensions.Contains(extension))
+                        {
+                            return BadRequest($"Invalid file format: {photo.FileName}");
+                        }
+
+                        if (photo.Length == 0)
+                            continue;
+
+                        if (photo.Length > 5 * 1024 * 1024) // 5MB
+                            return BadRequest($"File too large: {photo.FileName}");
+
+                        // Генерируем уникальное имя файла
+                        var fileName = $"{Guid.NewGuid()}{extension}";
+                        var filePath = Path.Combine(uploadPath, fileName);
+
+                        // Сохраняем файл на сервер
+                        using (var stream = new FileStream(filePath, FileMode.Create))
+                        {
+                            await photo.CopyToAsync(stream);
+                        }
+
+                        // Добавляем запись о фото в БД
+                        _context.ProductPhotos.Add(new ProductPhoto
+                        {
+                            ProductPhotoId = Guid.NewGuid(),
+                            PhotoPath = $"/images/products/{fileName}",
+                            ProductId = existingProduct.ProductId
+                        });
+                    }
+                    catch (Exception)
+                    {
+                        throw;
+                    }
+                }
+            }
 
             try
             {
                 await _context.SaveChangesAsync();
+                return NoContent();
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -166,8 +248,6 @@ namespace ArzanGo.Controllers
                     throw;
                 }
             }
-
-            return NoContent();
         }
 
         // DELETE: api/products/5

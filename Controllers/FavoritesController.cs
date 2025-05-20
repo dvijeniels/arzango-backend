@@ -31,6 +31,9 @@ namespace ArzanGo.Controllers
         [HttpPost]
         public async Task<ActionResult<Favorite>> AddToFavorites(Favorite favorite)
         {
+            DateTime utcNow = DateTime.UtcNow;
+            DateTime kgTime = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(utcNow, "Central Asia Standard Time");
+            favorite.DateAdded = kgTime;
             _context.Favorites.Add(favorite);
             await _context.SaveChangesAsync();
             return CreatedAtAction(nameof(GetFavorites), new { userId = favorite.UserId }, favorite);

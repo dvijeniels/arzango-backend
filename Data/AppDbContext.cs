@@ -43,6 +43,16 @@ namespace ArzanGo.Data
                 .WithMany(u => u.CourierOrders)
                 .HasForeignKey(o => o.CourierId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique()
+                .HasFilter("[Email] IS NOT NULL");
+
+            modelBuilder.Entity<User>()
+               .HasIndex(u => u.PhoneNumber)
+               .IsUnique()
+               .HasFilter("[PhoneNumber] IS NOT NULL");
         }
     }
 }
